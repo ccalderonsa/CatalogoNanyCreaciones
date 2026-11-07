@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nany Creaciones | Panel de Administración</title>
     <link rel="icon" type="image/jpeg" href="{{ url_for('logo_imagen') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=12">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=13">
 </head>
 <body>
     <!-- Barra Superior de Administración -->
@@ -309,10 +309,15 @@
                                         {% endif %}
                                     </div>
                                     <div class="order-meta-pills">
-                                        <span class="meta-pill">🚚 {{ ped['tipo_entrega'] if ped['tipo_entrega'] else 'Retiro' }}</span>
+                                        <span class="meta-pill">
+                                            🚚 {{ ped['tipo_entrega'] if ped['tipo_entrega'] else 'Retiro' }}{{ ' (+$3.000)' if 'Envío' in (ped['tipo_entrega'] or '') else '' }}
+                                        </span>
                                         <span class="meta-pill">💳 {{ ped['metodo_pago'] if ped['metodo_pago'] else 'Transferencia' }}</span>
                                         {% if ped['cupon_usado'] %}
                                             <span class="meta-pill meta-pill-coupon">🎟️ Cupón {{ ped['cupon_usado'] }} (-${{ "{:,.0f}".format(ped['descuento_monto']).replace(",", ".") }})</span>
+                                        {% endif %}
+                                        {% if ped.get('codigo_seguimiento') %}
+                                            <span class="meta-pill meta-pill-coupon">📦 {{ ped.get('empresa_envio') or 'Tracking' }}: {{ ped.get('codigo_seguimiento') }}</span>
                                         {% endif %}
                                     </div>
                                     {% if ped['direccion_envio'] %}
@@ -345,15 +350,30 @@
                                     <strong>${{ "{:,.0f}".format(ped['total']).replace(",", ".") }}</strong>
                                 </div>
 
-                                <form action="{{ url_for('cambiar_estado_pedido', codigo=ped['codigo']) }}" method="POST" class="order-status-form">
+                                <form action="{{ url_for('cambiar_estado_pedido', codigo=ped['codigo']) }}" method="POST" class="order-status-form" style="flex-direction: column; align-items: stretch; gap: 0.4rem; width: 100%;">
                                     <select name="estado">
                                         {% for est in estados_pedido %}
                                             <option value="{{ est }}" {{ 'selected' if ped['estado'] == est else '' }}>
-                                                {{ est }}{{ ' (Devuelve stock y elimina)' if est == 'Anulado' else '' }}
+                                                Estado: {{ est }}{{ ' (Devuelve stock)' if est == 'Anulado' else '' }}
                                             </option>
                                         {% endfor %}
                                     </select>
-                                    <button type="submit" class="btn-stock-save">Guardar Estado</button>
+                                    <select name="empresa_envio">
+                                        <option value="">Courier / Transporte (Opcional)</option>
+                                        {% for emp in empresas_envio %}
+                                            <option value="{{ emp }}" {{ 'selected' if ped.get('empresa_envio') == emp else '' }}>
+                                                🚚 {{ emp }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <input
+                                        type="text"
+                                        name="codigo_seguimiento"
+                                        value="{{ ped.get('codigo_seguimiento', '') }}"
+                                        placeholder="N° Seguimiento / OT (Opcional)"
+                                        style="padding: 0.42rem 0.65rem; border-radius: 8px; border: 1px solid #ced4da; font-size: 0.84rem;"
+                                    >
+                                    <button type="submit" class="btn-stock-save" style="width: 100%; margin-left: 0;">💾 Guardar Estado / Tracking</button>
                                 </form>
                                 {% if ped['wa_cliente_url'] %}
                                     <a href="{{ ped['wa_cliente_url'] }}" target="_blank" class="btn-wa-client">
