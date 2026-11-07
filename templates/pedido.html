@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ pedido['resumen_titulo'] }} | Nany Creaciones</title>
+
+    <!-- Etiquetas Open Graph para miniatura de foto en WhatsApp -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Nany Creaciones">
+    <meta property="og:title" content="{{ pedido['resumen_titulo'] }}">
+    <meta property="og:description" content="{{ pedido['resumen_desc'] }}">
+    <meta property="og:image" content="{{ base_publica }}{{ url_for('static', filename='uploads/' ~ pedido['imagen_collage']) }}">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:width" content="900">
+    <meta property="og:image:height" content="800">
+
+    <link rel="icon" type="image/jpeg" href="{{ url_for('logo_imagen') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=9">
+</head>
+<body>
+    <nav class="top-nav">
+        <div class="container top-nav-inner">
+            <div class="brand">
+                <img src="{{ url_for('logo_imagen') }}" alt="Logo Nany Creaciones" class="brand-logo">
+                <span class="brand-name">Nany Creaciones</span>
+                <span class="brand-divider">|</span>
+                <span class="brand-tagline">Comprobante y Seguimiento #{{ pedido['codigo'] }}</span>
+            </div>
+            <a href="{{ url_for('index') }}" class="btn-secondary btn-sm" style="text-decoration: none;">
+                ← Ir al Catálogo
+            </a>
+        </div>
+    </nav>
+
+    <main class="container" style="padding-top: 2rem;">
+        <!-- Cabecera y Seguimiento en Vivo del Pedido -->
+        <div class="receipt-card">
+            <div class="receipt-top-row">
+                <div>
+                    <span class="badge-hero">🛍️ Comprobante de Pedido #{{ pedido['codigo'] }}</span>
+                    <h1 class="receipt-title">Seguimiento y Resumen de tu Compra</h1>
+                    <p class="receipt-date">Registrado el {{ pedido['creado_en'] }}</p>
+                </div>
+                <span class="status-badge status-{{ pedido['estado'] | lower }}" style="font-size: 0.88rem; padding: 0.45rem 1rem;">
+                    Estado: {{ pedido['estado'] }}
+                </span>
+            </div>
+
+            <!-- Barra de Progreso de Seguimiento en Vivo -->
+            {% if pedido['estado'] == 'Anulado' %}
+                <div class="alert alert-error" style="margin: 1.25rem 0;">
+                    ⚠️ <strong>Pedido Anulado:</strong> Este pedido fue cancelado y las unidades fueron devueltas al inventario.
+                </div>
+            {% else %}
+                {% set paso = 1 if pedido['estado'] == 'Pendiente' else (2 if pedido['estado'] == 'Pagado' else 3) %}
+                <div class="tracking-stepper">
+                    <div class="step-item {{ 'step-done' if paso >= 1 else '' }} {{ 'step-current' if paso == 1 else '' }}">
+                        <div class="step-circle">1</div>
+                        <div class="step-label">
+                            <strong>Pedido Recibido</strong>
+                            <span>Pendiente de pago / confirmación</span>
+                        </div>
+                    </div>
+                    <div class="step-line {{ 'line-done' if paso >= 2 else '' }}"></div>
+                    <div class="step-item {{ 'step-done' if paso >= 2 else '' }} {{ 'step-current' if paso == 2 else '' }}">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">
+                            <strong>Pago Confirmado</strong>
+                            <span>En confección y preparación</span>
+                        </div>
+                    </div>
+                    <div class="step-line {{ 'line-done' if paso >= 3 else '' }}"></div>
+                    <div class="step-item {{ 'step-done' if paso >= 3 else '' }} {{ 'step-current' if paso == 3 else '' }}">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">
+                            <strong>Entregado / Enviado</strong>
+                            <span>Pedido finalizado</span>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Grilla de Detalles del Cliente y Datos de Pago -->
+            <div class="receipt-details-grid">
+                <div class="receipt-box">
+                    <h3>📋 Datos del Pedido</h3>
+                    <ul class="receipt-info-list">
+                        <li><span>👤 Cliente:</span> <strong>{{ pedido['cliente_nombre'] if pedido['cliente_nombre'] else 'No especificado' }}</strong></li>
+                        {% if pedido['cliente_telefono'] %}
+                            <li><span>📱 Teléfono / WhatsApp:</span> <strong>{{ pedido['cliente_telefono'] }}</strong></li>
+                        {% endif %}
+                        <li><span>🚚 Método de Entrega:</span> <strong>{{ pedido['tipo_entrega'] if pedido['tipo_entrega'] else 'Retiro / Punto de encuentro' }}</strong></li>
+                        {% if pedido['direccion_envio'] %}
+                            <li><span>🏠 Dirección de Envío:</span> <strong>{{ pedido['direccion_envio'] }}</strong></li>
+                        {% endif %}
+                        <li><span>💳 Forma de Pago:</span> <strong>{{ pedido['metodo_pago'] if pedido['metodo_pago'] else 'Transferencia Bancaria' }}</strong></li>
+                        {% if pedido['personalizacion'] %}
+                            <li><span>✨ Personalización:</span> <strong>{{ pedido['personalizacion'] }}</strong></li>
+                        {% endif %}
+                        {% if pedido['cliente_nota'] %}
+                            <li><span>📝 Nota:</span> <strong>{{ pedido['cliente_nota'] }}</strong></li>
+                        {% endif %}
+                    </ul>
+
+                    <div class="receipt-totals">
+                        {% if pedido['descuento_monto'] and pedido['descuento_monto'] > 0 %}
+                            <div class="receipt-total-row">
+                                <span>Subtotal:</span>
+                                <span>${{ "{:,.0f}".format(pedido['subtotal']).replace(",", ".") }}</span>
+                            </div>
+                            <div class="receipt-total-row receipt-discount">
+                                <span>🎟️ Cupón ({{ pedido['cupon_usado'] }}):</span>
+                                <span>-${{ "{:,.0f}".format(pedido['descuento_monto']).replace(",", ".") }}</span>
+                            </div>
+                        {% endif %}
+                        <div class="receipt-total-row receipt-grand-total">
+                            <span>Total a Pagar:</span>
+                            <strong>${{ "{:,.0f}".format(pedido['total']).replace(",", ".") }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="receipt-box receipt-payment-box">
+                    <h3>🏦 Datos para Transferencia y Coordinación</h3>
+                    {% if datos_transferencia %}
+                        <p class="receipt-payment-hint">Puedes transferir el total de <strong>${{ "{:,.0f}".format(pedido['total']).replace(",", ".") }}</strong> a la siguiente cuenta y enviar tu comprobante por WhatsApp:</p>
+                        <pre id="texto-transferencia" class="bank-details-pre">{{ datos_transferencia }}</pre>
+                        <button type="button" class="btn-secondary btn-sm" id="btn-copiar-banco" onclick="copiarDatosBancarios()" style="width: 100%; margin-bottom: 0.65rem;">
+                            📋 Copiar Datos de Transferencia
+                        </button>
+                    {% else %}
+                        <p class="receipt-payment-hint">Coordina los datos de transferencia o entrega directamente con Nany Creaciones por WhatsApp.</p>
+                    {% endif %}
+
+                    {% set msg_wa = "Hola Nany Creaciones! 👋 Te escribo por mi Pedido #" ~ pedido['codigo'] ~ " (Total: $" ~ "{:,.0f}".format(pedido['total']).replace(",", ".") ~ "). " ~ (base_publica ~ "/pedido/" ~ pedido['codigo']) %}
+                    <a
+                        href="https://wa.me/{{ whatsapp }}?text={{ msg_wa | urlencode }}"
+                        target="_blank"
+                        class="btn-whatsapp"
+                        style="text-decoration: none; width: 100%; display: inline-flex; justify-content: center;"
+                    >
+                        📲 Enviar Comprobante / Consultar por WhatsApp
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <h2 style="font-family: 'Fraunces', serif; font-size: 1.45rem; margin: 1.75rem 0 1rem;">
+            🎨 Diseños Incluidos en el Pedido #{{ pedido['codigo'] }}
+        </h2>
+
+        <section class="grid">
+            {% for item in items %}
+                <article class="card">
+                    <div class="card-image-wrapper">
+                        <img src="{{ url_for('static', filename='uploads/' ~ item['imagen']) }}" alt="{{ item['nombre'] }}">
+                        <span class="age-tag age-medium">{{ item['edad'] }}</span>
+                        <span class="selected-badge">Cantidad: {{ item['cantidad'] }}</span>
+                    </div>
+                    <div class="card-body">
+                        <h2 class="card-title">{{ item['cantidad'] }}x {{ item['nombre'] }}</h2>
+                        <div class="card-footer">
+                            <div class="price-block">
+                                <span class="price-label">Subtotal ({{ item['cantidad'] }} ud.)</span>
+                                <span class="price">${{ "{:,.0f}".format(item['subtotal']).replace(",", ".") }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </section>
+    </main>
+
+    <script>
+        function copiarDatosBancarios() {
+            const el = document.getElementById('texto-transferencia');
+            const btn = document.getElementById('btn-copiar-banco');
+            if (!el) return;
+            navigator.clipboard.writeText(el.innerText).then(() => {
+                const original = btn.textContent;
+                btn.textContent = '✓ ¡Datos copiados al portapapeles!';
+                setTimeout(() => { btn.textContent = original; }, 2500);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nany Creaciones | Panel de Administración</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('logo_imagen') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=9">
+</head>
+<body>
+    <!-- Barra Superior de Administración -->
+    <nav class="top-nav">
+        <div class="container top-nav-inner">
+            <div class="brand">
+                <img src="{{ url_for('logo_imagen') }}" alt="Logo Nany Creaciones" class="brand-logo">
+                <span class="brand-name">Nany Creaciones</span>
+                <span class="brand-divider">|</span>
+                <span class="brand-tagline">Panel de Administración</span>
+            </div>
+            <div class="header-actions">
+                <a href="{{ url_for('index') }}" class="btn-secondary btn-sm" target="_blank">
+                    👁️ Ver Tienda
+                </a>
+                <button class="btn-primary btn-sm" onclick="document.getElementById('modal-form').classList.add('open')">
+                    + Nuevo Producto
+                </button>
+                <a href="{{ url_for('logout') }}" class="btn-secondary btn-sm" title="Cerrar sesión">
+                    🔒 Salir
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero hero-compact">
+        <div class="container">
+            <div class="hero-content" style="margin-bottom: 1.5rem;">
+                <div class="hero-text">
+                    <span class="badge-hero">⚙️ Centro de Control</span>
+                    <h1>Gestión de Catálogo, Pedidos y Reportes</h1>
+                    <p>Administra tu inventario, ofertas, categorías, pedidos recibidos y reportes en Excel.</p>
+                </div>
+                <div class="hero-logo-showcase hero-logo-sm">
+                    <img src="{{ url_for('logo_imagen') }}" alt="Nany Creaciones">
+                </div>
+            </div>
+
+            <!-- Dashboard de Estadísticas (KPIs) -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <span class="kpi-label">Productos Totales</span>
+                    <strong class="kpi-value">{{ estadisticas['total_productos'] }}</strong>
+                    <span class="kpi-sub">
+                        👁️ {{ estadisticas['productos_visibles'] }} visibles · 🙈 {{ estadisticas['productos_ocultos'] }} ocultos
+                    </span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Unidades en Stock</span>
+                    <strong class="kpi-value">{{ estadisticas['unidades_en_stock'] }}</strong>
+                    <span class="kpi-sub {{ 'text-danger' if estadisticas['productos_agotados'] > 0 else '' }}">
+                        {% if estadisticas['productos_agotados'] > 0 %}
+                            ⚠️ {{ estadisticas['productos_agotados'] }} agotado(s)
+                        {% else %}
+                            ✓ Todo con stock disponible
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Pedidos Activos</span>
+                    <strong class="kpi-value">{{ estadisticas['total_pedidos'] }}</strong>
+                    <span class="kpi-sub">Recibidos desde el catálogo</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-label">Ventas en Pedidos</span>
+                    <strong class="kpi-value kpi-price">${{ "{:,.0f}".format(estadisticas['ingresos_totales']).replace(",", ".") }}</strong>
+                    <span class="kpi-sub">
+                        Pagados/Entregados: ${{ "{:,.0f}".format(estadisticas['ingresos_pagados']).replace(",", ".") }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alerts">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Pestañas Principales del Panel -->
+        <div class="admin-tabs">
+            <button type="button" class="admin-tab-btn {{ 'active' if tab_activa == 'inventario' else '' }}" onclick="cambiarTab('inventario', this)">
+                📦 Inventario ({{ productos|length }})
+            </button>
+            <button type="button" class="admin-tab-btn {{ 'active' if tab_activa == 'pedidos' else '' }}" onclick="cambiarTab('pedidos', this)">
+                🛍️ Pedidos Recibidos ({{ pedidos|length }})
+            </button>
+            <button type="button" class="admin-tab-btn {{ 'active' if tab_activa == 'reportes' else '' }}" onclick="cambiarTab('reportes', this)">
+                📊 Diseños Más Vendidos
+            </button>
+            <button type="button" class="admin-tab-btn {{ 'active' if tab_activa == 'configuracion' else '' }}" onclick="cambiarTab('configuracion', this)">
+                ⚙️ Categorías y Configuración
+            </button>
+        </div>
+
+        <!-- ==========================================
+             TAB 1: INVENTARIO DE PRODUCTOS
+             ========================================== -->
+        <section id="tab-inventario" class="admin-tab-panel" style="display: {{ 'block' if tab_activa == 'inventario' else 'none' }};">
+            <div class="toolbar">
+                <div class="search-sort-row">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input
+                            type="search"
+                            id="input-busqueda-admin"
+                            placeholder="Buscar producto en inventario..."
+                            oninput="aplicarFiltrosAdmin()"
+                        >
+                    </div>
+                    <div class="sort-box">
+                        <select id="select-orden-admin" onchange="aplicarFiltrosAdmin()">
+                            <option value="destacados">Ordenar: ⭐ Destacados y recientes</option>
+                            <option value="precio-asc">💲 Precio: Menor a Mayor</option>
+                            <option value="precio-desc">💲 Precio: Mayor a Menor</option>
+                            <option value="stock-asc">📉 Menor Stock primero</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="toolbar-bottom-row">
+                    <div class="filters">
+                        <span>Categorías:</span>
+                        <button type="button" class="filter-chip {{ 'active' if not edad_filtro else '' }}" data-filtro="" onclick="filtrarCategoriaAdmin('')">
+                            Todos
+                        </button>
+                        {% for rango in edades %}
+                            <button type="button" class="filter-chip {{ 'active' if edad_filtro == rango else '' }}" data-filtro="{{ rango }}" onclick="filtrarCategoriaAdmin({{ rango | tojson | forceescape }})">
+                                {{ rango }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                    <div class="count" id="contador-admin">
+                        Mostrando <strong>{{ productos|length }}</strong> producto{{ 's' if productos|length != 1 else '' }}
+                    </div>
+                </div>
+            </div>
+
+            {% if productos %}
+                <div class="grid" id="grid-admin">
+                    {% for item in productos %}
+                        {% set tiene_oferta = item['precio_anterior'] and item['precio_anterior'] > item['precio'] %}
+                        {% set pct_descuento = (((item['precio_anterior'] - item['precio']) / item['precio_anterior']) * 100) | round | int if tiene_oferta else 0 %}
+                        <article
+                            class="card {{ 'card-hidden-admin' if item['visible'] == 0 else '' }} {{ 'card-featured' if item['destacado'] == 1 else '' }}"
+                            data-id="{{ item['id'] }}"
+                            data-categoria="{{ item['edad'] }}"
+                            data-nombre="{{ item['nombre'] | lower }}"
+                            data-desc="{{ item['descripcion'] | lower }}"
+                            data-precio="{{ item['precio'] }}"
+                            data-stock="{{ item['stock'] }}"
+                            data-destacado="{{ item['destacado'] }}"
+                        >
+                            <div class="card-image-wrapper clickable-image" onclick="verImagenAdmin('{{ url_for('static', filename='uploads/' ~ item['imagen']) }}', {{ item['nombre'] | tojson }})" title="Clic para ver imagen completa">
+                                <img src="{{ url_for('static', filename='uploads/' ~ item['imagen']) }}" alt="{{ item['nombre'] }}" loading="lazy">
+                                <div class="top-left-badges">
+                                    <span class="age-tag {{ 'age-small' if item['edad'] == '2 a 5 años' else 'age-medium' }}">
+                                        {{ 'Edad: ' ~ item['edad'] if 'años' in item['edad'] else item['edad'] }}
+                                    </span>
+                                    {% if item['destacado'] == 1 %}
+                                        <span class="featured-tag">⭐ Destacado</span>
+                                    {% endif %}
+                                    {% if tiene_oferta %}
+                                        <span class="discount-tag">🔥 -{{ pct_descuento }}%</span>
+                                    {% endif %}
+                                </div>
+                                <span class="stock-tag {{ 'stock-out' if item['stock'] <= 0 else 'stock-ok' }}">
+                                    {{ 'Agotado (0)' if item['stock'] <= 0 else 'Stock: ' ~ item['stock'] }}
+                                </span>
+                                {% if item['visible'] == 0 %}
+                                    <span class="hidden-banner">🙈 Oculto en tienda</span>
+                                {% endif %}
+                                <span class="zoom-hint">🔍 Ampliar foto</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="card-header-row">
+                                    <h2 class="card-title">{{ item['nombre'] }}</h2>
+                                    <div style="display: flex; gap: 0.3rem;">
+                                        <form action="{{ url_for('toggle_destacado', producto_id=item['id']) }}" method="POST">
+                                            <button
+                                                type="submit"
+                                                class="btn-visibility {{ 'vis-star' if item['destacado'] == 1 else 'vis-off' }}"
+                                                title="{{ 'Quitar de destacados' if item['destacado'] == 1 else 'Marcar como Destacado' }}"
+                                            >
+                                                ⭐
+                                            </button>
+                                        </form>
+                                        <form action="{{ url_for('toggle_visible', producto_id=item['id']) }}" method="POST">
+                                            <button
+                                                type="submit"
+                                                class="btn-visibility {{ 'vis-on' if item['visible'] == 1 else 'vis-off' }}"
+                                                title="{{ 'Clic para ocultar temporalmente' if item['visible'] == 1 else 'Clic para mostrar en tienda' }}"
+                                            >
+                                                {{ '👁️ Visible' if item['visible'] == 1 else '🙈 Oculto' }}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <p class="card-desc">{{ item['descripcion'] }}</p>
+
+                                <!-- Editor rápido de Stock -->
+                                <form action="{{ url_for('actualizar_stock', producto_id=item['id']) }}" method="POST" class="stock-edit-row">
+                                    <label for="stock-{{ item['id'] }}">Stock:</label>
+                                    <input
+                                        type="number"
+                                        id="stock-{{ item['id'] }}"
+                                        name="stock"
+                                        value="{{ item['stock'] }}"
+                                        min="0"
+                                        step="1"
+                                        required
+                                    >
+                                    <button type="submit" class="btn-stock-save">Guardar Stock</button>
+                                </form>
+
+                                <div class="card-footer">
+                                    <div class="price-block">
+                                        <span class="price-label">{{ 'Oferta' if tiene_oferta else 'Precio' }}</span>
+                                        <div class="price-line">
+                                            {% if tiene_oferta %}
+                                                <span class="old-price">${{ "{:,.0f}".format(item['precio_anterior']).replace(",", ".") }}</span>
+                                            {% endif %}
+                                            <span class="price">${{ "{:,.0f}".format(item['precio']).replace(",", ".") }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="admin-card-actions">
+                                        <button
+                                            type="button"
+                                            class="btn-edit"
+                                            onclick='abrirModalEditar({{ dict(item) | tojson }})'
+                                        >
+                                            ✏️ Editar
+                                        </button>
+                                        <form action="{{ url_for('eliminar_producto', producto_id=item['id']) }}" method="POST" onsubmit="return confirm('¿Deseas eliminar definitivamente este producto del catálogo?');">
+                                            <button type="submit" class="btn-delete" title="Eliminar producto">🗑️</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">✨</div>
+                    <h2>Aún no hay productos cargados</h2>
+                    <p>Sube la primera imagen con su descripción, categoría, precio y stock disponible.</p>
+                    <button class="btn-primary" onclick="document.getElementById('modal-form').classList.add('open')">
+                        + Subir Primer Producto
+                    </button>
+                </div>
+            {% endif %}
+        </section>
+
+        <!-- ==========================================
+             TAB 2: HISTORIAL DE PEDIDOS RECIBIDOS
+             ========================================== -->
+        <section id="tab-pedidos" class="admin-tab-panel" style="display: {{ 'block' if tab_activa == 'pedidos' else 'none' }};">
+            <div class="export-bar">
+                <div>
+                    <h3>🛍️ Registro de Pedidos Recibidos</h3>
+                    <p>Gestiona el estado de cada compra o descarga la planilla completa para Excel.</p>
+                </div>
+                <a href="{{ url_for('exportar_pedidos_csv') }}" class="btn-secondary btn-sm" style="text-decoration: none;">
+                    📥 Descargar Pedidos (Excel / CSV)
+                </a>
+            </div>
+
+            {% if pedidos %}
+                <div class="orders-list">
+                    {% for ped in pedidos %}
+                        <article class="order-card {{ 'order-cancelled' if ped['estado'] == 'Anulado' else '' }}">
+                            <img
+                                src="{{ url_for('static', filename='uploads/' ~ ped['imagen_collage']) }}"
+                                alt="Pedido #{{ ped['codigo'] }}"
+                                class="order-thumb clickable-image"
+                                onclick="verImagenAdmin('{{ url_for('static', filename='uploads/' ~ ped['imagen_collage']) }}', 'Pedido #{{ ped['codigo'] }}')"
+                            >
+                            <div class="order-info">
+                                <div class="order-top-row">
+                                    <div>
+                                        <span class="order-code">Pedido #{{ ped['codigo'] }}</span>
+                                        <span class="order-date">{{ ped['creado_en'] }}</span>
+                                    </div>
+                                    <span class="status-badge status-{{ ped['estado'] | lower }}">
+                                        {{ ped['estado'] }}
+                                    </span>
+                                </div>
+
+                                <div class="order-client">
+                                    <div>
+                                        <strong>👤 Cliente:</strong> {{ ped['cliente_nombre'] if ped['cliente_nombre'] else 'No especificado' }}
+                                        {% if ped['cliente_telefono'] %}
+                                            <span style="margin-left: 0.65rem; color: var(--text-muted);">📱 <strong>Tel:</strong> {{ ped['cliente_telefono'] }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="order-meta-pills">
+                                        <span class="meta-pill">🚚 {{ ped['tipo_entrega'] if ped['tipo_entrega'] else 'Retiro' }}</span>
+                                        <span class="meta-pill">💳 {{ ped['metodo_pago'] if ped['metodo_pago'] else 'Transferencia' }}</span>
+                                        {% if ped['cupon_usado'] %}
+                                            <span class="meta-pill meta-pill-coupon">🎟️ Cupón {{ ped['cupon_usado'] }} (-${{ "{:,.0f}".format(ped['descuento_monto']).replace(",", ".") }})</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if ped['direccion_envio'] %}
+                                        <div style="margin-top: 0.25rem; font-size: 0.86rem;">
+                                            🏠 <strong>Dirección de Envío:</strong> {{ ped['direccion_envio'] }}
+                                        </div>
+                                    {% endif %}
+                                    {% if ped['personalizacion'] %}
+                                        <div class="order-custom-badge">
+                                            ✨ <strong>Personalización:</strong> {{ ped['personalizacion'] }}
+                                        </div>
+                                    {% endif %}
+                                    {% if ped['cliente_nota'] %}
+                                        <div class="order-note">📝 "{{ ped['cliente_nota'] }}"</div>
+                                    {% endif %}
+                                </div>
+
+                                <ul class="order-items-ul">
+                                    {% for it in ped['items'] %}
+                                        <li>
+                                            <strong>{{ it['cantidad'] }}x {{ it['nombre'] }}</strong> ({{ it['edad'] }}) — ${{ "{:,.0f}".format(it['subtotal']).replace(",", ".") }}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+
+                            <div class="order-actions-col">
+                                <div class="order-total-box">
+                                    <span>Total</span>
+                                    <strong>${{ "{:,.0f}".format(ped['total']).replace(",", ".") }}</strong>
+                                </div>
+
+                                <form action="{{ url_for('cambiar_estado_pedido', codigo=ped['codigo']) }}" method="POST" class="order-status-form">
+                                    <select name="estado">
+                                        {% for est in estados_pedido %}
+                                            <option value="{{ est }}" {{ 'selected' if ped['estado'] == est else '' }}>
+                                                {{ est }}{{ ' (Devuelve stock y elimina)' if est == 'Anulado' else '' }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="btn-stock-save">Guardar Estado</button>
+                                </form>
+                                {% if ped['wa_cliente_url'] %}
+                                    <a href="{{ ped['wa_cliente_url'] }}" target="_blank" class="btn-wa-client">
+                                        💬 Hablar al Cliente por WhatsApp
+                                    </a>
+                                {% endif %}
+                                <a href="{{ url_for('ver_pedido', codigo=ped['codigo']) }}" target="_blank" class="order-view-link">
+                                    🔗 Ver comprobante y seguimiento
+                                </a>
+                            </div>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">🛍️</div>
+                    <h2>Aún no hay pedidos registrados</h2>
+                    <p>Cuando los clientes confirmen sus pedidos en el catálogo, aparecerán aquí con sus fotos, personalización y estado.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <!-- ==========================================
+             TAB 3: REPORTE DE DISEÑOS MÁS VENDIDOS
+             ========================================== -->
+        <section id="tab-reportes" class="admin-tab-panel" style="display: {{ 'block' if tab_activa == 'reportes' else 'none' }};">
+            <div class="export-bar">
+                <div>
+                    <h3>📊 Reporte de Ventas e Inventario</h3>
+                    <p>Descarga el reporte consolidado de inventario, precios, stock y unidades vendidas en formato Excel / CSV.</p>
+                </div>
+                <a href="{{ url_for('exportar_inventario_csv') }}" class="btn-primary btn-sm" style="text-decoration: none;">
+                    📥 Exportar Inventario y Ventas (Excel / CSV)
+                </a>
+            </div>
+
+            <div class="reports-grid">
+                <div class="report-box">
+                    <h3>🏆 Ranking de Diseños Más Vendidos</h3>
+                    <p class="report-sub">Calculado sobre todos los pedidos activos (excluyendo pedidos anulados).</p>
+
+                    {% if ranking_productos %}
+                        <div class="ranking-list">
+                            {% for prod in ranking_productos %}
+                                <div class="ranking-row">
+                                    <span class="ranking-pos">#{{ loop.index }}</span>
+                                    <img src="{{ url_for('static', filename='uploads/' ~ prod['imagen']) }}" alt="{{ prod['nombre'] }}" class="ranking-img">
+                                    <div class="ranking-details">
+                                        <div class="ranking-title-line">
+                                            <strong>{{ prod['nombre'] }}</strong>
+                                            <span class="ranking-units">{{ prod['unidades_vendidas'] }} ud. vendidas</span>
+                                        </div>
+                                        <span class="ranking-meta">
+                                            Categoría: {{ prod['edad'] }} · Ingresos: <strong>${{ "{:,.0f}".format(prod['ingresos']).replace(",", ".") }}</strong> · Stock actual: {{ prod['stock_actual'] }}
+                                        </span>
+                                        <div class="progress-track">
+                                            <div class="progress-fill" style="width: {{ prod['porcentaje_barra'] }}%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty-cart-msg">Aún no hay ventas registradas para mostrar el ranking de diseños.</p>
+                    {% endif %}
+                </div>
+
+                <div class="report-box">
+                    <h3>📂 Ventas por Categoría</h3>
+                    <p class="report-sub">Distribución de unidades e ingresos según categoría.</p>
+
+                    {% if ranking_categorias %}
+                        <div class="category-sales-list">
+                            {% for cat in ranking_categorias %}
+                                <div class="cat-sale-item">
+                                    <div>
+                                        <strong>{{ cat['categoria'] }}</strong>
+                                        <span>{{ cat['unidades'] }} unidad(es) vendidas</span>
+                                    </div>
+                                    <strong class="cat-sale-amount">${{ "{:,.0f}".format(cat['ingresos']).replace(",", ".") }}</strong>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="empty-cart-msg">Sin ventas por categoría todavía.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             TAB 4: CATEGORÍAS, WHATSAPP Y CONTRASEÑA
+             ========================================== -->
+        <section id="tab-configuracion" class="admin-tab-panel" style="display: {{ 'block' if tab_activa == 'configuracion' else 'none' }};">
+            <!-- Gestor Dinámico de Categorías -->
+            <div class="whatsapp-config-card" style="flex-direction: column; align-items: stretch;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h3>🏷️ Administrar Categorías del Catálogo</h3>
+                        <p>Agrega nuevas categorías o elimina las que no tengan productos asociados.</p>
+                    </div>
+                    <form action="{{ url_for('agregar_categoria') }}" method="POST" class="whatsapp-form">
+                        <input
+                            type="text"
+                            name="nombre_categoria"
+                            placeholder="Nueva categoría (ej: Bolsos, Gorros Chef...)"
+                            maxlength="50"
+                            required
+                        >
+                        <button type="submit" class="btn-primary">+ Agregar Categoría</button>
+                    </form>
+                </div>
+
+                <div class="categories-manager-list">
+                    {% for cat in edades %}
+                        <div class="cat-manage-pill">
+                            <span>{{ cat }}</span>
+                            <form action="{{ url_for('eliminar_categoria') }}" method="POST" onsubmit="return confirm('¿Eliminar la categoría {{ cat }}?');">
+                                <input type="hidden" name="nombre_categoria" value="{{ cat }}">
+                                <button type="submit" class="cat-remove-btn" title="Eliminar categoría">&times;</button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Gestor de Cupones de Descuento -->
+            <div class="whatsapp-config-card" style="flex-direction: column; align-items: stretch;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h3>🎟️ Cupones de Descuento Promocionales</h3>
+                        <p>Crea códigos promocionales para que tus clientes los ingresen al finalizar su compra (ej: <strong>NANY10</strong> para 10% de descuento).</p>
+                    </div>
+                    <form action="{{ url_for('agregar_cupon') }}" method="POST" class="whatsapp-form">
+                        <input
+                            type="text"
+                            name="codigo_cupon"
+                            placeholder="Código (ej: NANY10)"
+                            maxlength="25"
+                            style="text-transform: uppercase; min-width: 160px;"
+                            required
+                        >
+                        <input
+                            type="number"
+                            name="porcentaje_cupon"
+                            placeholder="% Descuento (ej: 10)"
+                            min="1"
+                            max="90"
+                            style="min-width: 150px;"
+                            required
+                        >
+                        <button type="submit" class="btn-primary">+ Crear Cupón</button>
+                    </form>
+                </div>
+
+                {% if cupones %}
+                    <div class="categories-manager-list">
+                        {% for cup in cupones %}
+                            <div class="cat-manage-pill">
+                                <span>🎟️ <strong>{{ cup['codigo'] }}</strong> (-{{ cup['porcentaje'] }}%)</span>
+                                <form action="{{ url_for('eliminar_cupon') }}" method="POST" onsubmit="return confirm('¿Eliminar el cupón {{ cup['codigo'] }}?');">
+                                    <input type="hidden" name="codigo_cupon" value="{{ cup['codigo'] }}">
+                                    <button type="submit" class="cat-remove-btn" title="Eliminar cupón">&times;</button>
+                                </form>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p style="margin-top: 0.75rem; font-size: 0.86rem; color: var(--text-muted);">No hay cupones activos actualmente.</p>
+                {% endif %}
+            </div>
+
+            <!-- Datos Bancarios para Transferencia -->
+            <div class="whatsapp-config-card" style="flex-direction: column; align-items: stretch;">
+                <div>
+                    <h3>🏦 Datos Bancarios para Transferencia</h3>
+                    <p>Estos datos se muestran automáticamente al cliente en su comprobante de pedido con un botón para copiar en 1 clic.</p>
+                </div>
+                <form action="{{ url_for('guardar_datos_transferencia') }}" method="POST" style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%;">
+                    <textarea
+                        name="datos_transferencia"
+                        rows="5"
+                        style="width: 100%; padding: 0.85rem; border-radius: 14px; border: 1.5px solid #ced4da; font-family: inherit; font-size: 0.92rem;"
+                        placeholder="Banco, Tipo de Cuenta, Número, Nombre, RUT y Correo..."
+                    >{{ datos_transferencia }}</textarea>
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button type="submit" class="btn-primary">💾 Guardar Datos Bancarios</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="whatsapp-config-card">
+                <div>
+                    <h3>📱 Número de WhatsApp para recibir pedidos</h3>
+                    <p>Ingresa tu número con código de país (sin el signo +, ej: <strong>56912345678</strong> o <strong>5511999999999</strong>).</p>
+                </div>
+                <form action="{{ url_for('guardar_whatsapp') }}" method="POST" class="whatsapp-form">
+                    <input
+                        type="text"
+                        name="whatsapp"
+                        value="{{ whatsapp }}"
+                        placeholder="Ej: 56912345678"
+                        required
+                    >
+                    <button type="submit" class="btn-whatsapp">Guardar WhatsApp</button>
+                </form>
+            </div>
+
+            <div class="whatsapp-config-card">
+                <div>
+                    <h3>🔐 Contraseña / PIN del Panel de Administración</h3>
+                    <p>Cambia la clave privada que se solicita en <code>/login</code> para entrar a este panel.</p>
+                </div>
+                <form action="{{ url_for('cambiar_pin') }}" method="POST" class="whatsapp-form">
+                    <input
+                        type="password"
+                        name="nuevo_pin"
+                        placeholder="Nueva contraseña (mín. 4 caracteres)"
+                        minlength="4"
+                        required
+                    >
+                    <button type="submit" class="btn-primary">Actualizar Clave</button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal para cargar nuevo producto -->
+    <div id="modal-form" class="modal-backdrop" onclick="if(event.target === this) this.classList.remove('open')">
+        <div class="modal">
+            <div class="sheet-handle"></div>
+            <div class="modal-header">
+                <h2>Cargar Nuevo Producto</h2>
+                <button type="button" class="btn-close" onclick="document.getElementById('modal-form').classList.remove('open')">&times;</button>
+            </div>
+            <form action="{{ url_for('agregar_producto') }}" method="POST" enctype="multipart/form-data" class="form-grid">
+                <div class="form-group">
+                    <label for="nombre">Nombre o Modelo *</label>
+                    <input type="text" id="nombre" name="nombre" placeholder="Ej: Delantal Dinosaurios / Morral Infantil" maxlength="80" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="imagen">Imagen del Producto *</label>
+                    <input type="file" id="imagen" name="imagen" accept="image/*" required onchange="previewImage(event)">
+                    <div id="preview-container" class="preview-container" style="display: none;">
+                        <img id="image-preview" src="" alt="Vista previa">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="descripcion">Descripción *</label>
+                    <textarea id="descripcion" name="descripcion" rows="3" placeholder="Ej: Tela impermeable con bolsillo frontal y tiras ajustables..." required></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edad">Categoría *</label>
+                        <select id="edad" name="edad" required>
+                            <option value="" disabled selected>Selecciona la categoría...</option>
+                            {% for cat in edades %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="stock">Stock Inicial *</label>
+                        <input type="number" id="stock" name="stock" min="0" step="1" value="5" placeholder="Ej: 10" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="precio">Precio Actual ($) *</label>
+                        <input type="number" id="precio" name="precio" min="0" step="any" placeholder="Ej: 10000" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="precio_anterior">Precio Anterior Tachado (Opcional)</label>
+                        <input type="number" id="precio_anterior" name="precio_anterior" min="0" step="any" placeholder="Ej: 12990 (para mostrar oferta)">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-row">
+                        <input type="checkbox" name="destacado" value="1">
+                        <span>⭐ Marcar como producto <strong>Destacado</strong> (aparecerá primero en el catálogo)</span>
+                    </label>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="document.getElementById('modal-form').classList.remove('open')">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar en el Catálogo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Editar Producto Existente -->
+    <div id="modal-editar" class="modal-backdrop" onclick="if(event.target === this) this.classList.remove('open')">
+        <div class="modal">
+            <div class="sheet-handle"></div>
+            <div class="modal-header">
+                <h2>✏️ Editar Producto</h2>
+                <button type="button" class="btn-close" onclick="document.getElementById('modal-editar').classList.remove('open')">&times;</button>
+            </div>
+            <form id="form-editar" action="" method="POST" enctype="multipart/form-data" class="form-grid">
+                <div class="form-group">
+                    <label for="edit-nombre">Nombre o Modelo *</label>
+                    <input type="text" id="edit-nombre" name="nombre" maxlength="80" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-descripcion">Descripción *</label>
+                    <textarea id="edit-descripcion" name="descripcion" rows="3" required></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-edad">Categoría *</label>
+                        <select id="edit-edad" name="edad" required>
+                            {% for cat in edades %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-stock">Stock disponible *</label>
+                        <input type="number" id="edit-stock" name="stock" min="0" step="1" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-precio">Precio Actual ($) *</label>
+                        <input type="number" id="edit-precio" name="precio" min="0" step="any" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-precio-anterior">Precio Anterior Tachado ($)</label>
+                        <input type="number" id="edit-precio-anterior" name="precio_anterior" min="0" step="any" placeholder="0 si no está en oferta">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-visible">Estado en tienda *</label>
+                        <select id="edit-visible" name="visible">
+                            <option value="1">👁️ Visible en el catálogo</option>
+                            <option value="0">🙈 Oculto / Pausado</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-destacado">Destacado *</label>
+                        <select id="edit-destacado" name="destacado">
+                            <option value="0">Normal</option>
+                            <option value="1">⭐ Destacado (Aparece primero)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit-imagen">Cambiar Imagen (dejar vacío para mantener la actual)</label>
+                    <input type="file" id="edit-imagen" name="imagen" accept="image/*">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="document.getElementById('modal-editar').classList.remove('open')">Cancelar</button>
+                    <button type="submit" class="btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Visor de Imagen Completa (Lightbox) -->
+    <div id="modal-imagen" class="modal-backdrop lightbox-backdrop" onclick="if(event.target === this) document.getElementById('modal-imagen').classList.remove('open')">
+        <div class="lightbox-modal">
+            <button type="button" class="lightbox-close" onclick="document.getElementById('modal-imagen').classList.remove('open')" title="Cerrar">&times;</button>
+            <div class="lightbox-img-container">
+                <img id="lightbox-img" src="" alt="Vista completa del producto">
+            </div>
+            <div class="lightbox-footer">
+                <h3 id="lightbox-title"></h3>
+                <button type="button" class="btn-secondary" onclick="document.getElementById('modal-imagen').classList.remove('open')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let categoriaAdminActual = {{ edad_filtro | tojson }};
+
+        function cambiarTab(nombreTab, btnEl) {
+            document.querySelectorAll('.admin-tab-panel').forEach(p => {
+                p.style.display = 'none';
+            });
+            document.querySelectorAll('.admin-tab-btn').forEach(b => {
+                b.classList.remove('active');
+            });
+            const target = document.getElementById('tab-' + nombreTab);
+            if (target) target.style.display = 'block';
+            if (btnEl) btnEl.classList.add('active');
+        }
+
+        function abrirModalEditar(prod) {
+            document.getElementById('form-editar').action = '/editar/' + prod.id;
+            document.getElementById('edit-nombre').value = prod.nombre || '';
+            document.getElementById('edit-descripcion').value = prod.descripcion || '';
+            document.getElementById('edit-edad').value = prod.edad || '';
+            document.getElementById('edit-precio').value = prod.precio || 0;
+            document.getElementById('edit-precio-anterior').value = prod.precio_anterior || 0;
+            document.getElementById('edit-stock').value = prod.stock !== undefined ? prod.stock : 0;
+            document.getElementById('edit-visible').value = prod.visible !== undefined ? String(prod.visible) : '1';
+            document.getElementById('edit-destacado').value = prod.destacado !== undefined ? String(prod.destacado) : '0';
+            document.getElementById('edit-imagen').value = '';
+            document.getElementById('modal-editar').classList.add('open');
+        }
+
+        function verImagenAdmin(url, titulo) {
+            document.getElementById('lightbox-img').src = url;
+            document.getElementById('lightbox-title').textContent = titulo;
+            document.getElementById('modal-imagen').classList.add('open');
+        }
+
+        function filtrarCategoriaAdmin(categoria) {
+            categoriaAdminActual = categoria;
+            const chips = document.querySelectorAll('#tab-inventario .filter-chip');
+            chips.forEach(chip => {
+                if (chip.getAttribute('data-filtro') === categoria) {
+                    chip.classList.add('active');
+                } else {
+                    chip.classList.remove('active');
+                }
+            });
+            aplicarFiltrosAdmin();
+        }
+
+        function aplicarFiltrosAdmin() {
+            const grid = document.getElementById('grid-admin');
+            if (!grid) return;
+
+            const termino = (document.getElementById('input-busqueda-admin')?.value || '').trim().toLowerCase();
+            const criterioOrden = document.getElementById('select-orden-admin')?.value || 'destacados';
+
+            const cards = Array.from(grid.querySelectorAll('.card'));
+
+            cards.sort((a, b) => {
+                const precioA = parseFloat(a.getAttribute('data-precio') || '0');
+                const precioB = parseFloat(b.getAttribute('data-precio') || '0');
+                const stockA = parseInt(a.getAttribute('data-stock') || '0', 10);
+                const stockB = parseInt(b.getAttribute('data-stock') || '0', 10);
+                const destA = parseInt(a.getAttribute('data-destacado') || '0', 10);
+                const destB = parseInt(b.getAttribute('data-destacado') || '0', 10);
+                const idA = parseInt(a.getAttribute('data-id') || '0', 10);
+                const idB = parseInt(b.getAttribute('data-id') || '0', 10);
+
+                if (criterioOrden === 'precio-asc') return precioA - precioB;
+                if (criterioOrden === 'precio-desc') return precioB - precioA;
+                if (criterioOrden === 'stock-asc') return stockA - stockB;
+                if (destB !== destA) return destB - destA;
+                return idB - idA;
+            });
+
+            let visibles = 0;
+            cards.forEach(card => {
+                grid.appendChild(card);
+                const catCard = card.getAttribute('data-categoria');
+                const nomCard = card.getAttribute('data-nombre') || '';
+                const descCard = card.getAttribute('data-desc') || '';
+
+                const coincideCat = !categoriaAdminActual || catCard === categoriaAdminActual;
+                const coincideTexto = !termino || nomCard.includes(termino) || descCard.includes(termino);
+
+                if (coincideCat && coincideTexto) {
+                    card.style.display = 'flex';
+                    visibles++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            const contador = document.getElementById('contador-admin');
+            if (contador) {
+                contador.innerHTML = `Mostrando <strong>${visibles}</strong> producto${visibles !== 1 ? 's' : ''}`;
+            }
+        }
+
+        function previewImage(event) {
+            const file = event.target.files[0];
+            const container = document.getElementById('preview-container');
+            const preview = document.getElementById('image-preview');
+            if (file) {
+                preview.src = URL.createObjectURL(file);
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

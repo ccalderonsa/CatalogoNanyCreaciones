@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nany Creaciones | Catálogo Oficial de Delantales, Morrales y Accesorios</title>
+    <link rel="icon" type="image/jpeg" href="{{ url_for('logo_imagen') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=9">
+</head>
+<body>
+    <!-- Barra Superior Elegante -->
+    <nav class="top-nav">
+        <div class="container top-nav-inner">
+            <div class="brand">
+                <img src="{{ url_for('logo_imagen') }}" alt="Logo Nany Creaciones" class="brand-logo">
+                <span class="brand-name">Nany Creaciones</span>
+                <span class="brand-divider">|</span>
+                <span class="brand-tagline">Catálogo Exclusivo</span>
+            </div>
+            <button class="btn-cart-header" onclick="abrirModalPedido()">
+                <span class="cart-icon">🛍️</span>
+                <span>Mi Pedido</span>
+                <span class="cart-count-pill" id="header-cart-count">0</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Cabecera Editorial -->
+    <header class="hero">
+        <div class="container hero-content">
+            <div class="hero-text">
+                <span class="badge-hero">✨ Confección &amp; Diseño</span>
+                <h1>Delantales, Morrales y Accesorios con Encanto</h1>
+                <p>Creaciones cómodas, resistentes y llenas de estilo para niños, niñas y adultos. Selecciona tus favoritos, personalízalos y realiza tu pedido directo por WhatsApp.</p>
+                <div class="trust-pills">
+                    <span>✓ Diseños Exclusivos</span>
+                    <span>✓ Opción de Personalizado</span>
+                    <span>✓ Atención Directa</span>
+                </div>
+            </div>
+            <div class="hero-logo-showcase">
+                <img src="{{ url_for('logo_imagen') }}" alt="Nany Creaciones">
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="toolbar">
+            <div class="search-sort-row">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input
+                        type="search"
+                        id="input-busqueda"
+                        placeholder="Buscar diseño (ej: Capibara, Stich, Impermeable...)"
+                        oninput="aplicarFiltrosYOrden()"
+                    >
+                </div>
+                <div class="sort-box">
+                    <select id="select-orden" onchange="aplicarFiltrosYOrden()">
+                        <option value="destacados">Ordenar: ⭐ Destacados y recientes</option>
+                        <option value="precio-asc">💲 Precio: Menor a Mayor</option>
+                        <option value="precio-desc">💲 Precio: Mayor a Menor</option>
+                        <option value="nombre-asc">🔤 Nombre: A - Z</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="toolbar-bottom-row">
+                <div class="filters">
+                    <span>Categorías:</span>
+                    <button type="button" class="filter-chip {{ 'active' if not edad_filtro else '' }}" data-filtro="" onclick="filtrarCategoria('')">
+                        Todos
+                    </button>
+                    {% for rango in edades %}
+                        <button type="button" class="filter-chip {{ 'active' if edad_filtro == rango else '' }}" data-filtro="{{ rango }}" onclick="filtrarCategoria({{ rango | tojson | forceescape }})">
+                            {{ rango }}
+                        </button>
+                    {% endfor %}
+                </div>
+                <div class="count" id="contador-productos">
+                    Mostrando <strong>{{ productos|length }}</strong> producto{{ 's' if productos|length != 1 else '' }}
+                </div>
+            </div>
+        </section>
+
+        {% if productos %}
+            <section class="grid" id="grid-productos">
+                {% for item in productos %}
+                    {% set tiene_oferta = item['precio_anterior'] and item['precio_anterior'] > item['precio'] %}
+                    {% set pct_descuento = (((item['precio_anterior'] - item['precio']) / item['precio_anterior']) * 100) | round | int if tiene_oferta else 0 %}
+                    <article
+                        class="card {{ 'card-out' if item['stock'] <= 0 else '' }} {{ 'card-featured' if item['destacado'] == 1 else '' }}"
+                        id="card-{{ item['id'] }}"
+                        data-id="{{ item['id'] }}"
+                        data-categoria="{{ item['edad'] }}"
+                        data-nombre="{{ item['nombre'] | lower }}"
+                        data-desc="{{ item['descripcion'] | lower }}"
+                        data-precio="{{ item['precio'] }}"
+                        data-destacado="{{ item['destacado'] }}"
+                    >
+                        <div class="card-image-wrapper clickable-image" onclick="verImagenCompleta({{ item['id'] }})" title="Clic para ver imagen completa">
+                            <img src="{{ url_for('static', filename='uploads/' ~ item['imagen']) }}" alt="{{ item['nombre'] }}" loading="lazy">
+                            <div class="top-left-badges">
+                                <span class="age-tag {{ 'age-small' if item['edad'] == '2 a 5 años' else 'age-medium' }}">
+                                    {{ 'Edad: ' ~ item['edad'] if 'años' in item['edad'] else item['edad'] }}
+                                </span>
+                                {% if item['destacado'] == 1 %}
+                                    <span class="featured-tag">⭐ Destacado</span>
+                                {% endif %}
+                                {% if tiene_oferta %}
+                                    <span class="discount-tag">🔥 -{{ pct_descuento }}%</span>
+                                {% endif %}
+                            </div>
+                            <span class="selected-badge" id="badge-{{ item['id'] }}" style="display: none;">
+                                ✓ En tu pedido
+                            </span>
+                            <span class="zoom-hint">🔍 Ampliar foto</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="card-header-row">
+                                <h2 class="card-title">{{ item['nombre'] }}</h2>
+                                <span
+                                    class="client-stock-pill {{ 'pill-out' if item['stock'] <= 0 else 'pill-ok' }}"
+                                    id="stock-pill-{{ item['id'] }}"
+                                >
+                                    {{ 'Agotado' if item['stock'] <= 0 else 'Disponibles: ' ~ item['stock'] }}
+                                </span>
+                            </div>
+                            <p class="card-desc">{{ item['descripcion'] }}</p>
+                            <div class="card-footer">
+                                <div class="price-block">
+                                    <span class="price-label">{{ 'Oferta' if tiene_oferta else 'Precio' }}</span>
+                                    <div class="price-line">
+                                        {% if tiene_oferta %}
+                                            <span class="old-price">${{ "{:,.0f}".format(item['precio_anterior']).replace(",", ".") }}</span>
+                                        {% endif %}
+                                        <span class="price">${{ "{:,.0f}".format(item['precio']).replace(",", ".") }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="select-controls" id="controls-{{ item['id'] }}">
+                                    <button
+                                        type="button"
+                                        class="btn-select"
+                                        id="btn-add-{{ item['id'] }}"
+                                        onclick="cambiarCantidad({{ item['id'] }}, 1)"
+                                        {{ 'disabled' if item['stock'] <= 0 else '' }}
+                                    >
+                                        {{ 'Agotado' if item['stock'] <= 0 else '+ Seleccionar' }}
+                                    </button>
+                                    <div class="qty-box" id="qty-box-{{ item['id'] }}" style="display: none;">
+                                        <button type="button" class="qty-btn" onclick="cambiarCantidad({{ item['id'] }}, -1)">−</button>
+                                        <span class="qty-val" id="qty-val-{{ item['id'] }}">1</span>
+                                        <button type="button" class="qty-btn" id="qty-plus-{{ item['id'] }}" onclick="cambiarCantidad({{ item['id'] }}, 1)">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                {% endfor %}
+            </section>
+            <section class="empty-state" id="empty-filter-state" style="display: none;">
+                <div class="empty-icon">🔍</div>
+                <h2>No encontramos productos con ese filtro o búsqueda</h2>
+                <p>Prueba buscando otra palabra clave o selecciona la categoría "Todos".</p>
+                <button type="button" class="btn-secondary" onclick="limpiarFiltrosCliente()">
+                    Ver todo el catálogo
+                </button>
+            </section>
+        {% else %}
+            <section class="empty-state">
+                <div class="empty-icon">✨</div>
+                <h2>Pronto habrán más productos disponibles</h2>
+                <p>Por el momento no hay productos publicados en esta sección.</p>
+            </section>
+        {% endif %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <p><strong>Nany Creaciones</strong> · Catálogo de Delantales, Morrales, Loncheras y Accesorios</p>
+            <span>Selecciona tus productos favoritos y coordina tu pedido fácilmente vía WhatsApp.</span>
+        </div>
+    </footer>
+
+    <!-- Barra flotante inferior cuando hay productos seleccionados -->
+    <div id="floating-cart" class="floating-cart" style="display: none;">
+        <div class="container floating-cart-content">
+            <div class="floating-cart-info">
+                <span class="floating-badge" id="floating-count">0</span>
+                <div>
+                    <strong>Productos en tu pedido</strong>
+                    <div class="floating-total">Total estimado: <span id="floating-total-price">$0</span></div>
+                </div>
+            </div>
+            <div class="floating-cart-actions">
+                <button type="button" class="btn-secondary btn-sm" onclick="vaciarPedido()">Vaciar</button>
+                <button type="button" class="btn-whatsapp" onclick="abrirModalPedido()">
+                    Revisar y Enviar por WhatsApp →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Resumen de Pedido y Envío por WhatsApp -->
+    <div id="modal-pedido" class="modal-backdrop" onclick="if(event.target === this) cerrarModalPedido()">
+        <div class="modal modal-checkout">
+            <div class="sheet-handle"></div>
+            <div class="modal-header">
+                <div>
+                    <h2>🛍️ Resumen de tu Pedido</h2>
+                    <p class="modal-subtitle">Revisa tus productos y completa tus datos para coordinar la entrega</p>
+                </div>
+                <button type="button" class="btn-close" onclick="cerrarModalPedido()">&times;</button>
+            </div>
+
+            <div id="cart-items-list" class="cart-items-list"></div>
+
+            <!-- Cupón de Descuento -->
+            <div class="coupon-box">
+                <div class="coupon-input-row">
+                    <input type="text" id="cupon-codigo" placeholder="🎟️ Código de descuento (ej: NANY10)" style="text-transform: uppercase;">
+                    <button type="button" class="btn-secondary btn-sm" onclick="aplicarCuponCliente()">Aplicar cupón</button>
+                </div>
+                <div id="cupon-mensaje" class="coupon-msg" style="display: none;"></div>
+            </div>
+
+            <!-- Desglose de Subtotal, Descuento y Total -->
+            <div class="cart-summary-breakdown">
+                <div class="summary-line" id="fila-subtotal" style="display: none;">
+                    <span>Subtotal:</span>
+                    <span id="modal-subtotal-price">$0</span>
+                </div>
+                <div class="summary-line summary-discount" id="fila-descuento" style="display: none;">
+                    <span id="label-descuento">Descuento:</span>
+                    <span id="modal-discount-price">-$0</span>
+                </div>
+                <div class="cart-summary-total">
+                    <span>Total a Pagar:</span>
+                    <strong id="modal-total-price">$0</strong>
+                </div>
+            </div>
+
+            <div class="checkout-sections">
+                <!-- Paso 1: Datos de Contacto -->
+                <div class="checkout-section-card">
+                    <div class="checkout-section-title">1. Tus Datos de Contacto</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cliente-nombre">👤 Tu Nombre *</label>
+                            <input type="text" id="cliente-nombre" placeholder="Ej: María González">
+                        </div>
+                        <div class="form-group">
+                            <label for="cliente-telefono">📱 Tu WhatsApp / Teléfono</label>
+                            <input type="tel" id="cliente-telefono" placeholder="Ej: +56 9 1234 5678">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Paso 2: Método de Entrega (Tarjetas visuales) -->
+                <div class="checkout-section-card">
+                    <div class="checkout-section-title">2. ¿Cómo prefieres recibir tu pedido?</div>
+                    <input type="hidden" id="cliente-tipo-entrega" value="Retiro / Punto de encuentro">
+                    <div class="option-cards-grid option-cards-2">
+                        <button
+                            type="button"
+                            class="option-choice-card active"
+                            data-entrega="Retiro / Punto de encuentro"
+                            onclick="seleccionarEntrega('Retiro / Punto de encuentro', this)"
+                        >
+                            <span class="option-choice-icon">📍</span>
+                            <div class="option-choice-text">
+                                <strong>Retiro / Punto de encuentro</strong>
+                                <span>Coordinamos día y lugar de entrega</span>
+                            </div>
+                        </button>
+                        <button
+                            type="button"
+                            class="option-choice-card"
+                            data-entrega="Envío a domicilio"
+                            onclick="seleccionarEntrega('Envío a domicilio', this)"
+                        >
+                            <span class="option-choice-icon">🚚</span>
+                            <div class="option-choice-text">
+                                <strong>Envío a domicilio</strong>
+                                <span>Despacho a tu dirección o sucursal</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    <div class="form-group" id="grupo-direccion" style="display: none; margin-top: 0.85rem;">
+                        <label for="cliente-direccion">🏠 Dirección de Envío y Comuna / Ciudad *</label>
+                        <input type="text" id="cliente-direccion" placeholder="Ej: Av. Providencia 1234, Depto 502, Santiago">
+                    </div>
+                </div>
+
+                <!-- Paso 3: Forma de Pago (Tarjetas visuales) -->
+                <div class="checkout-section-card">
+                    <div class="checkout-section-title">3. Selecciona tu Forma de Pago</div>
+                    <input type="hidden" id="cliente-metodo-pago" value="Transferencia Bancaria">
+                    <div class="option-cards-grid option-cards-3">
+                        <button
+                            type="button"
+                            class="option-choice-card active"
+                            data-pago="Transferencia Bancaria"
+                            onclick="seleccionarPago('Transferencia Bancaria', this)"
+                        >
+                            <span class="option-choice-icon">🏦</span>
+                            <div class="option-choice-text">
+                                <strong>Transferencia</strong>
+                                <span>Verás los datos al confirmar</span>
+                            </div>
+                        </button>
+                        <button
+                            type="button"
+                            class="option-choice-card"
+                            data-pago="Efectivo"
+                            onclick="seleccionarPago('Efectivo', this)"
+                        >
+                            <span class="option-choice-icon">💵</span>
+                            <div class="option-choice-text">
+                                <strong>Efectivo</strong>
+                                <span>Al momento de retirar</span>
+                            </div>
+                        </button>
+                        <button
+                            type="button"
+                            class="option-choice-card"
+                            data-pago="Coordinar por WhatsApp"
+                            onclick="seleccionarPago('Coordinar por WhatsApp', this)"
+                        >
+                            <span class="option-choice-icon">💬</span>
+                            <div class="option-choice-text">
+                                <strong>Coordinar</strong>
+                                <span>Acordar por WhatsApp</span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Paso 4: Personalización y Notas -->
+                <div class="checkout-section-card">
+                    <div class="checkout-section-title">4. Personalización y Detalles (Opcional)</div>
+                    <div class="form-grid" style="gap: 0.75rem;">
+                        <div class="form-group">
+                            <label for="cliente-personalizacion">✨ Nombre para bordar / estampar</label>
+                            <input type="text" id="cliente-personalizacion" placeholder="Ej: Bordar nombre 'Sofía' en el delantal">
+                        </div>
+                        <div class="form-group">
+                            <label for="cliente-nota">📝 Comentario o indicación adicional</label>
+                            <textarea id="cliente-nota" rows="2" placeholder="Ej: Consulta sobre fecha de entrega, regalo o talla..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="checkout-actions-footer">
+                <button type="button" class="btn-whatsapp btn-checkout-main" id="btn-enviar-wa" onclick="confirmarYEnviarPedido(false)">
+                    📲 Confirmar y Enviar Pedido por WhatsApp
+                </button>
+                <div class="checkout-secondary-btns">
+                    <button type="button" class="btn-secondary btn-sm" onclick="cerrarModalPedido()">
+                        ← Seguir viendo productos
+                    </button>
+                    <button type="button" class="btn-primary btn-sm" id="btn-share-foto" style="display: none;" onclick="confirmarYEnviarPedido(true)">
+                        📸 Enviar como archivo de imagen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Visor de Imagen Completa (Lightbox) -->
+    <div id="modal-imagen" class="modal-backdrop lightbox-backdrop" onclick="if(event.target === this) cerrarImagenCompleta()">
+        <div class="lightbox-modal">
+            <button type="button" class="lightbox-close" onclick="cerrarImagenCompleta()" title="Cerrar">&times;</button>
+            <div class="lightbox-img-container">
+                <img id="lightbox-img" src="" alt="Vista completa del producto">
+            </div>
+            <div class="lightbox-footer">
+                <div>
+                    <h3 id="lightbox-title"></h3>
+                    <p id="lightbox-meta"></p>
+                </div>
+                <button type="button" class="btn-primary" id="lightbox-select-btn" onclick="">
+                    + Seleccionar este Producto
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let CATALOGO_PRODUCTOS = {{ todos_productos | tojson }};
+        const WHATSAPP_NUMBER = {{ whatsapp | tojson }};
+        const STORAGE_KEY = 'pedido_delantales_v1';
+        let categoriaSeleccionada = {{ edad_filtro | tojson }};
+        let cuponAplicado = null; // { codigo, porcentaje }
+
+        const mapaProductos = {};
+        function reconstruirMapa() {
+            CATALOGO_PRODUCTOS.forEach(p => {
+                mapaProductos[p.id] = p;
+            });
+        }
+        reconstruirMapa();
+
+        function obtenerCarrito() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                const parsed = raw ? JSON.parse(raw) : {};
+                Object.keys(parsed).forEach(id => {
+                    const prod = mapaProductos[id];
+                    if (!prod || prod.stock <= 0 || parsed[id] <= 0) {
+                        delete parsed[id];
+                    } else if (parsed[id] > prod.stock) {
+                        parsed[id] = prod.stock;
+                    }
+                });
+                return parsed;
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function guardarCarrito(carrito) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(carrito));
+            actualizarInterfaz();
+        }
+
+        function formatearPrecio(valor) {
+            return '$' + Math.round(valor).toLocaleString('es-CL');
+        }
+
+        function cambiarCantidad(id, delta) {
+            const prod = mapaProductos[id];
+            if (!prod) return;
+
+            const carrito = obtenerCarrito();
+            const actual = carrito[id] || 0;
+            const nueva = actual + delta;
+
+            if (nueva > prod.stock) {
+                alert(`Solo quedan ${prod.stock} unidad(es) disponibles de "${prod.nombre}".`);
+                return;
+            }
+
+            if (nueva <= 0) {
+                delete carrito[id];
+            } else {
+                carrito[id] = nueva;
+            }
+            guardarCarrito(carrito);
+        }
+
+        function vaciarPedido() {
+            localStorage.removeItem(STORAGE_KEY);
+            actualizarInterfaz();
+            cerrarModalPedido();
+        }
+
+        function actualizarInterfaz() {
+            const carrito = obtenerCarrito();
+            let totalUnidades = 0;
+            let totalPrecio = 0;
+
+            Object.keys(carrito).forEach(id => {
+                const prod = mapaProductos[id];
+                if (prod) {
+                    const cant = carrito[id];
+                    totalUnidades += cant;
+                    totalPrecio += prod.precio * cant;
+                }
+            });
+
+            CATALOGO_PRODUCTOS.forEach(prod => {
+                const cant = carrito[prod.id] || 0;
+                const card = document.getElementById('card-' + prod.id);
+                const btnAdd = document.getElementById('btn-add-' + prod.id);
+                const qtyBox = document.getElementById('qty-box-' + prod.id);
+                const qtyVal = document.getElementById('qty-val-' + prod.id);
+                const qtyPlus = document.getElementById('qty-plus-' + prod.id);
+                const badge = document.getElementById('badge-' + prod.id);
+                const stockPill = document.getElementById('stock-pill-' + prod.id);
+
+                if (!card) return;
+
+                if (stockPill) {
+                    if (prod.stock <= 0) {
+                        stockPill.textContent = 'Agotado';
+                        stockPill.className = 'client-stock-pill pill-out';
+                        card.classList.add('card-out');
+                    } else {
+                        stockPill.textContent = 'Disponibles: ' + prod.stock;
+                        stockPill.className = 'client-stock-pill pill-ok';
+                        card.classList.remove('card-out');
+                    }
+                }
+
+                if (prod.stock <= 0) {
+                    card.classList.remove('card-selected');
+                    if (btnAdd) {
+                        btnAdd.style.display = 'inline-block';
+                        btnAdd.disabled = true;
+                        btnAdd.textContent = 'Agotado';
+                    }
+                    if (qtyBox) qtyBox.style.display = 'none';
+                    if (badge) badge.style.display = 'none';
+                    return;
+                } else if (btnAdd) {
+                    btnAdd.disabled = false;
+                    btnAdd.textContent = '+ Seleccionar';
+                }
+
+                if (cant > 0) {
+                    card.classList.add('card-selected');
+                    if (btnAdd) btnAdd.style.display = 'none';
+                    if (qtyBox) qtyBox.style.display = 'inline-flex';
+                    if (qtyVal) qtyVal.textContent = cant;
+                    if (qtyPlus) qtyPlus.disabled = cant >= prod.stock;
+                    if (badge) badge.style.display = 'inline-block';
+                } else {
+                    card.classList.remove('card-selected');
+                    if (btnAdd) btnAdd.style.display = 'inline-block';
+                    if (qtyBox) qtyBox.style.display = 'none';
+                    if (badge) badge.style.display = 'none';
+                }
+            });
+
+            document.getElementById('header-cart-count').textContent = totalUnidades;
+            document.getElementById('floating-count').textContent = totalUnidades;
+
+            let montoDescuento = 0;
+            if (cuponAplicado && cuponAplicado.porcentaje > 0) {
+                montoDescuento = Math.round(totalPrecio * (cuponAplicado.porcentaje / 100));
+            }
+            const totalFinal = Math.max(0, totalPrecio - montoDescuento);
+
+            document.getElementById('floating-total-price').textContent = formatearPrecio(totalFinal);
+            document.getElementById('modal-total-price').textContent = formatearPrecio(totalFinal);
+
+            const filaSub = document.getElementById('fila-subtotal');
+            const filaDesc = document.getElementById('fila-descuento');
+            if (montoDescuento > 0) {
+                if (filaSub) {
+                    filaSub.style.display = 'flex';
+                    document.getElementById('modal-subtotal-price').textContent = formatearPrecio(totalPrecio);
+                }
+                if (filaDesc) {
+                    filaDesc.style.display = 'flex';
+                    document.getElementById('label-descuento').textContent = `Descuento (${cuponAplicado.codigo} -${cuponAplicado.porcentaje}%):`;
+                    document.getElementById('modal-discount-price').textContent = '-' + formatearPrecio(montoDescuento);
+                }
+            } else {
+                if (filaSub) filaSub.style.display = 'none';
+                if (filaDesc) filaDesc.style.display = 'none';
+            }
+
+            const floatingBar = document.getElementById('floating-cart');
+            floatingBar.style.display = totalUnidades > 0 ? 'block' : 'none';
+
+            renderizarListaModal(carrito);
+        }
+
+        function seleccionarEntrega(valor, btnEl) {
+            const input = document.getElementById('cliente-tipo-entrega');
+            if (input) input.value = valor;
+            document.querySelectorAll('[data-entrega]').forEach(b => b.classList.remove('active'));
+            if (btnEl) btnEl.classList.add('active');
+            cambiarTipoEntrega();
+        }
+
+        function seleccionarPago(valor, btnEl) {
+            const input = document.getElementById('cliente-metodo-pago');
+            if (input) input.value = valor;
+            document.querySelectorAll('[data-pago]').forEach(b => b.classList.remove('active'));
+            if (btnEl) btnEl.classList.add('active');
+        }
+
+        function cambiarTipoEntrega() {
+            const tipo = document.getElementById('cliente-tipo-entrega')?.value || '';
+            const grupoDir = document.getElementById('grupo-direccion');
+            if (grupoDir) {
+                grupoDir.style.display = tipo.includes('Envío') ? 'flex' : 'none';
+            }
+        }
+
+        async function aplicarCuponCliente() {
+            const input = document.getElementById('cupon-codigo');
+            const msgEl = document.getElementById('cupon-mensaje');
+            const codigo = (input?.value || '').trim().toUpperCase();
+
+            if (!codigo) {
+                cuponAplicado = null;
+                if (msgEl) msgEl.style.display = 'none';
+                actualizarInterfaz();
+                return;
+            }
+
+            try {
+                const resp = await fetch('/api/validar-cupon', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ codigo })
+                });
+                const data = await resp.json();
+                if (resp.ok && data.ok) {
+                    cuponAplicado = { codigo: data.codigo, porcentaje: data.porcentaje };
+                    if (msgEl) {
+                        msgEl.style.display = 'block';
+                        msgEl.className = 'coupon-msg coupon-ok';
+                        msgEl.textContent = `✓ ${data.mensaje}`;
+                    }
+                } else {
+                    cuponAplicado = null;
+                    if (msgEl) {
+                        msgEl.style.display = 'block';
+                        msgEl.className = 'coupon-msg coupon-err';
+                        msgEl.textContent = data.error || 'Cupón no válido.';
+                    }
+                }
+                actualizarInterfaz();
+            } catch (e) {
+                if (msgEl) {
+                    msgEl.style.display = 'block';
+                    msgEl.className = 'coupon-msg coupon-err';
+                    msgEl.textContent = 'No se pudo validar el cupón.';
+                }
+            }
+        }
+
+        function renderizarListaModal(carrito) {
+            const container = document.getElementById('cart-items-list');
+            const ids = Object.keys(carrito);
+            const btnWa = document.getElementById('btn-enviar-wa');
+
+            if (ids.length === 0) {
+                container.innerHTML = '<p class="empty-cart-msg">Aún no has seleccionado ningún producto. Haz clic en "+ Seleccionar" en los modelos que te gusten.</p>';
+                if (btnWa) btnWa.disabled = true;
+                return;
+            }
+
+            if (btnWa) btnWa.disabled = false;
+
+            container.innerHTML = ids.map(id => {
+                const prod = mapaProductos[id];
+                const cant = carrito[id];
+                const subtotal = prod.precio * cant;
+                const alMaximo = cant >= prod.stock;
+                return `
+                    <div class="cart-item">
+                        <img src="/static/uploads/${prod.imagen}" alt="${prod.nombre}" class="cart-item-img">
+                        <div class="cart-item-info">
+                            <strong>${prod.nombre}</strong>
+                            <span class="cart-item-meta">${prod.edad} · ${formatearPrecio(prod.precio)} c/u (Stock: ${prod.stock})</span>
+                        </div>
+                        <div class="qty-box">
+                            <button type="button" class="qty-btn" onclick="cambiarCantidad(${prod.id}, -1)">−</button>
+                            <span class="qty-val">${cant}</span>
+                            <button type="button" class="qty-btn" onclick="cambiarCantidad(${prod.id}, 1)" ${alMaximo ? 'disabled' : ''}>+</button>
+                        </div>
+                        <div class="cart-item-subtotal">${formatearPrecio(subtotal)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function abrirModalPedido() {
+            actualizarInterfaz();
+            document.getElementById('modal-pedido').classList.add('open');
+        }
+
+        function cerrarModalPedido() {
+            document.getElementById('modal-pedido').classList.remove('open');
+        }
+
+        async function confirmarYEnviarPedido(compartirArchivo = false) {
+            const carrito = obtenerCarrito();
+            const ids = Object.keys(carrito);
+            if (ids.length === 0) {
+                alert('Selecciona al menos un producto para realizar el pedido.');
+                return;
+            }
+
+            const nombre = document.getElementById('cliente-nombre').value.trim();
+            const telefono = document.getElementById('cliente-telefono').value.trim();
+            const tipoEntrega = document.getElementById('cliente-tipo-entrega').value;
+            const direccionEnvio = document.getElementById('cliente-direccion').value.trim();
+            const metodoPago = document.getElementById('cliente-metodo-pago').value;
+            const personalizacion = document.getElementById('cliente-personalizacion').value.trim();
+            const nota = document.getElementById('cliente-nota').value.trim();
+            const btnWa = document.getElementById('btn-enviar-wa');
+            const btnShare = document.getElementById('btn-share-foto');
+
+            if (!nombre) {
+                alert('Por favor ingresa tu nombre para registrar tu pedido.');
+                document.getElementById('cliente-nombre').focus();
+                return;
+            }
+
+            if (tipoEntrega.includes('Envío') && !direccionEnvio) {
+                alert('Por favor ingresa tu dirección y comuna/ciudad para el envío a domicilio.');
+                document.getElementById('cliente-direccion').focus();
+                return;
+            }
+
+            let lineas = [];
+            lineas.push('¡Hola! 👋 Quisiera realizar el siguiente pedido en *Nany Creaciones*:');
+            lineas.push('');
+
+            let subtotalPedido = 0;
+            ids.forEach(id => {
+                const prod = mapaProductos[id];
+                const cant = carrito[id];
+                const subtotal = prod.precio * cant;
+                subtotalPedido += subtotal;
+                lineas.push(`• *${cant}x ${prod.nombre}* (${prod.edad}) - ${formatearPrecio(subtotal)}`);
+            });
+
+            let descuentoMonto = 0;
+            if (cuponAplicado && cuponAplicado.porcentaje > 0) {
+                descuentoMonto = Math.round(subtotalPedido * (cuponAplicado.porcentaje / 100));
+            }
+            const totalFinal = Math.max(0, subtotalPedido - descuentoMonto);
+
+            lineas.push('');
+            if (descuentoMonto > 0) {
+                lineas.push(`Subtotal: ${formatearPrecio(subtotalPedido)}`);
+                lineas.push(`🎟️ Cupón ${cuponAplicado.codigo} (-${cuponAplicado.porcentaje}%): -${formatearPrecio(descuentoMonto)}`);
+            }
+            lineas.push(`*Total a Pagar: ${formatearPrecio(totalFinal)}*`);
+            lineas.push('');
+            lineas.push(`👤 Cliente: ${nombre}`);
+            if (telefono) {
+                lineas.push(`📱 Teléfono: ${telefono}`);
+            }
+            lineas.push(`🚚 Entrega: ${tipoEntrega}`);
+            if (tipoEntrega.includes('Envío') && direccionEnvio) {
+                lineas.push(`🏠 Dirección: ${direccionEnvio}`);
+            }
+            lineas.push(`💳 Pago: ${metodoPago}`);
+            if (personalizacion) {
+                lineas.push(`✨ Personalización: ${personalizacion}`);
+            }
+            if (nota) {
+                lineas.push(`📝 Nota: ${nota}`);
+            }
+
+            btnWa.disabled = true;
+            if (btnShare) btnShare.disabled = true;
+            btnWa.textContent = 'Procesando pedido...';
+
+            try {
+                const respuesta = await fetch('/api/comprar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: carrito,
+                        cliente_nombre: nombre,
+                        cliente_telefono: telefono,
+                        tipo_entrega: tipoEntrega,
+                        direccion_envio: tipoEntrega.includes('Envío') ? direccionEnvio : '',
+                        metodo_pago: metodoPago,
+                        personalizacion: personalizacion,
+                        cliente_nota: nota,
+                        cupon_codigo: cuponAplicado ? cuponAplicado.codigo : ''
+                    })
+                });
+                const resultado = await respuesta.json();
+
+                if (!respuesta.ok || !resultado.ok) {
+                    alert(resultado.error || 'No se pudo procesar el descuento de stock.');
+                    return;
+                }
+
+                const baseUrl = window.location.origin;
+                const fichaUrl = resultado.ficha_url || `${baseUrl}/pedido/${resultado.codigo_pedido}`;
+
+                CATALOGO_PRODUCTOS = resultado.productos;
+                reconstruirMapa();
+                localStorage.removeItem(STORAGE_KEY);
+                cuponAplicado = null;
+                actualizarInterfaz();
+                cerrarModalPedido();
+
+                if (compartirArchivo && navigator.canShare && resultado.imagen_collage) {
+                    try {
+                        const imgResp = await fetch(resultado.imagen_collage);
+                        const blob = await imgResp.blob();
+                        const file = new File([blob], `pedido-${resultado.codigo_pedido}.jpg`, { type: 'image/jpeg' });
+                        if (navigator.canShare({ files: [file] })) {
+                            await navigator.share({
+                                files: [file],
+                                title: 'Pedido Nany Creaciones',
+                                text: lineas.join('\n')
+                            });
+                            window.location.href = `/pedido/${resultado.codigo_pedido}`;
+                            return;
+                        }
+                    } catch (shareErr) {
+                        // Continúa al enlace de WhatsApp
+                    }
+                }
+
+                const lineasConVistaPrevia = [
+                    fichaUrl,
+                    '',
+                    ...lineas
+                ];
+                const textoCodificado = encodeURIComponent(lineasConVistaPrevia.join('\n'));
+                const urlWhatsApp = WHATSAPP_NUMBER
+                    ? `https://wa.me/${WHATSAPP_NUMBER}?text=${textoCodificado}`
+                    : `https://wa.me/?text=${textoCodificado}`;
+
+                window.open(urlWhatsApp, '_blank');
+                // Redirigir a la boleta/seguimiento en vivo con datos de transferencia
+                window.location.href = `/pedido/${resultado.codigo_pedido}`;
+            } catch (err) {
+                alert('Ocurrió un error de conexión al procesar el pedido.');
+            } finally {
+                btnWa.disabled = false;
+                if (btnShare) btnShare.disabled = false;
+                btnWa.textContent = '📲 Confirmar y Enviar Pedido por WhatsApp';
+            }
+        }
+
+        function verImagenCompleta(id) {
+            const prod = mapaProductos[id];
+            if (!prod) return;
+
+            document.getElementById('lightbox-img').src = '/static/uploads/' + prod.imagen;
+            document.getElementById('lightbox-img').alt = prod.nombre;
+            document.getElementById('lightbox-title').textContent = prod.nombre;
+            document.getElementById('lightbox-meta').textContent =
+                `${prod.edad} · ${formatearPrecio(prod.precio)} · ${prod.stock > 0 ? 'Disponibles: ' + prod.stock : 'Agotado'}`;
+
+            const btnSelect = document.getElementById('lightbox-select-btn');
+            const carrito = obtenerCarrito();
+            const enCarrito = carrito[id] || 0;
+
+            if (prod.stock <= 0) {
+                btnSelect.disabled = true;
+                btnSelect.textContent = 'Agotado';
+            } else if (enCarrito >= prod.stock) {
+                btnSelect.disabled = true;
+                btnSelect.textContent = `✓ ${enCarrito} en tu pedido (máx. stock)`;
+            } else {
+                btnSelect.disabled = false;
+                btnSelect.textContent = enCarrito > 0
+                    ? `+ Agregar otro (${enCarrito} en pedido)`
+                    : '+ Seleccionar este Producto';
+                btnSelect.onclick = function () {
+                    cambiarCantidad(id, 1);
+                    verImagenCompleta(id);
+                };
+            }
+
+            document.getElementById('modal-imagen').classList.add('open');
+        }
+
+        function cerrarImagenCompleta() {
+            document.getElementById('modal-imagen').classList.remove('open');
+        }
+
+        function filtrarCategoria(categoria) {
+            categoriaSeleccionada = categoria;
+            const chips = document.querySelectorAll('.filter-chip');
+            chips.forEach(chip => {
+                if (chip.getAttribute('data-filtro') === categoria) {
+                    chip.classList.add('active');
+                } else {
+                    chip.classList.remove('active');
+                }
+            });
+            aplicarFiltrosYOrden();
+        }
+
+        function limpiarFiltrosCliente() {
+            const inputBusq = document.getElementById('input-busqueda');
+            if (inputBusq) inputBusq.value = '';
+            filtrarCategoria('');
+        }
+
+        function aplicarFiltrosYOrden() {
+            const grid = document.getElementById('grid-productos');
+            if (!grid) return;
+
+            const termino = (document.getElementById('input-busqueda')?.value || '').trim().toLowerCase();
+            const criterioOrden = document.getElementById('select-orden')?.value || 'destacados';
+
+            const cards = Array.from(grid.querySelectorAll('.card'));
+
+            // Ordenar tarjetas
+            cards.sort((a, b) => {
+                const precioA = parseFloat(a.getAttribute('data-precio') || '0');
+                const precioB = parseFloat(b.getAttribute('data-precio') || '0');
+                const destA = parseInt(a.getAttribute('data-destacado') || '0', 10);
+                const destB = parseInt(b.getAttribute('data-destacado') || '0', 10);
+                const idA = parseInt(a.getAttribute('data-id') || '0', 10);
+                const idB = parseInt(b.getAttribute('data-id') || '0', 10);
+                const nomA = a.getAttribute('data-nombre') || '';
+                const nomB = b.getAttribute('data-nombre') || '';
+
+                if (criterioOrden === 'precio-asc') return precioA - precioB;
+                if (criterioOrden === 'precio-desc') return precioB - precioA;
+                if (criterioOrden === 'nombre-asc') return nomA.localeCompare(nomB, 'es');
+                if (destB !== destA) return destB - destA;
+                return idB - idA;
+            });
+
+            let visibles = 0;
+            cards.forEach(card => {
+                grid.appendChild(card);
+                const catCard = card.getAttribute('data-categoria');
+                const nomCard = card.getAttribute('data-nombre') || '';
+                const descCard = card.getAttribute('data-desc') || '';
+
+                const coincideCat = !categoriaSeleccionada || catCard === categoriaSeleccionada;
+                const coincideTexto = !termino || nomCard.includes(termino) || descCard.includes(termino) || (catCard && catCard.toLowerCase().includes(termino));
+
+                if (coincideCat && coincideTexto) {
+                    card.style.display = 'flex';
+                    visibles++;
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+
+            const contador = document.getElementById('contador-productos');
+            if (contador) {
+                contador.innerHTML = `Mostrando <strong>${visibles}</strong> producto${visibles !== 1 ? 's' : ''}`;
+            }
+
+            const emptyFilter = document.getElementById('empty-filter-state');
+            if (emptyFilter) {
+                if (visibles === 0) {
+                    grid.style.display = 'none';
+                    emptyFilter.style.display = 'block';
+                } else {
+                    grid.style.display = 'grid';
+                    emptyFilter.style.display = 'none';
+                }
+            }
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                cerrarImagenCompleta();
+                cerrarModalPedido();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            actualizarInterfaz();
+            if (categoriaSeleccionada) {
+                filtrarCategoria(categoriaSeleccionada);
+            }
+            if (navigator.canShare) {
+                const btnShare = document.getElementById('btn-share-foto');
+                if (btnShare) btnShare.style.display = 'inline-flex';
+            }
+        });
+    </script>
+</body>
+</html>
