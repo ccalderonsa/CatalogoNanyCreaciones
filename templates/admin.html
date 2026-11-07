@@ -322,7 +322,7 @@
                                     {% endif %}
                                     {% if ped['personalizacion'] %}
                                         <div class="order-custom-badge">
-                                            ✨ <strong>Personalización (+$2.500):</strong> {{ ped['personalizacion'] }}
+                                            ✨ <strong>Personalización (+${{ "{:,.0f}".format(ped['costo_personalizacion'] if ped.get('costo_personalizacion') else 1500).replace(",", ".") }}):</strong> {{ ped['personalizacion'] }}
                                         </div>
                                     {% endif %}
                                     {% if ped['cliente_nota'] %}
