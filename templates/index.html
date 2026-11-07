@@ -226,11 +226,15 @@
                 <div id="cupon-mensaje" class="coupon-msg" style="display: none;"></div>
             </div>
 
-            <!-- Desglose de Subtotal, Descuento y Total -->
+            <!-- Desglose de Subtotal, Personalización, Descuento y Total -->
             <div class="cart-summary-breakdown">
                 <div class="summary-line" id="fila-subtotal" style="display: none;">
-                    <span>Subtotal:</span>
+                    <span>Subtotal productos:</span>
                     <span id="modal-subtotal-price">$0</span>
+                </div>
+                <div class="summary-line" id="fila-personalizacion" style="display: none; color: var(--primary-hover); font-weight: 700;">
+                    <span>✨ Servicio de Personalización:</span>
+                    <span id="modal-personalizacion-price">+$2.500</span>
                 </div>
                 <div class="summary-line summary-discount" id="fila-descuento" style="display: none;">
                     <span id="label-descuento">Descuento:</span>
@@ -342,9 +346,13 @@
                 <!-- Paso 4: Personalización y Notas -->
                 <div class="checkout-section-card">
                     <div class="checkout-section-title">4. Personalización y Detalles (Opcional)</div>
-                    <div class="form-grid" style="gap: 0.75rem;">
+                    <label class="checkbox-row" for="check-personalizacion" style="margin-bottom: 0.2rem;">
+                        <input type="checkbox" id="check-personalizacion" onchange="togglePersonalizacion()">
+                        <span>✨ <strong>Agregar Personalización al delantal</strong> (+$2.500 adicional)</span>
+                    </label>
+                    <div id="contenedor-personalizacion" class="form-grid" style="gap: 0.75rem; display: none; margin-top: 0.8rem;">
                         <div class="form-group">
-                            <label for="cliente-personalizacion">✨ Nombre para bordar / estampar</label>
+                            <label for="cliente-personalizacion">✨ Nombre para bordar / estampar *</label>
                             <input type="text" id="cliente-personalizacion" placeholder="Ej: Bordar nombre 'Sofía' en el delantal">
                         </div>
                         <div class="form-group">
@@ -394,6 +402,7 @@
         let CATALOGO_PRODUCTOS = {{ todos_productos | tojson }};
         const WHATSAPP_NUMBER = {{ whatsapp | tojson }};
         const STORAGE_KEY = 'pedido_delantales_v1';
+        const COSTO_PERSONALIZACION = 2500;
         let categoriaSeleccionada = {{ edad_filtro | tojson }};
         let cuponAplicado = null; // { codigo, porcentaje }
 
@@ -455,8 +464,31 @@
 
         function vaciarPedido() {
             localStorage.removeItem(STORAGE_KEY);
+            const chkPers = document.getElementById('check-personalizacion');
+            if (chkPers) chkPers.checked = false;
+            const contPers = document.getElementById('contenedor-personalizacion');
+            if (contPers) contPers.style.display = 'none';
             actualizarInterfaz();
             cerrarModalPedido();
+        }
+
+        function togglePersonalizacion() {
+            const chkPers = document.getElementById('check-personalizacion');
+            const contPers = document.getElementById('contenedor-personalizacion');
+            const activo = chkPers ? chkPers.checked : false;
+            if (contPers) {
+                contPers.style.display = activo ? 'flex' : 'none';
+            }
+            if (!activo) {
+                const inpPers = document.getElementById('cliente-personalizacion');
+                const inpNota = document.getElementById('cliente-nota');
+                if (inpPers) inpPers.value = '';
+                if (inpNota) inpNota.value = '';
+            } else {
+                const inpPers = document.getElementById('cliente-personalizacion');
+                if (inpPers) inpPers.focus();
+            }
+            actualizarInterfaz();
         }
 
         function actualizarInterfaz() {
@@ -530,29 +562,48 @@
             document.getElementById('header-cart-count').textContent = totalUnidades;
             document.getElementById('floating-count').textContent = totalUnidades;
 
+            const chkPers = document.getElementById('check-personalizacion');
+            const conPersonalizacion = (totalUnidades > 0 && chkPers && chkPers.checked);
+            const recargoPersonalizacion = conPersonalizacion ? COSTO_PERSONALIZACION : 0;
+
             let montoDescuento = 0;
             if (cuponAplicado && cuponAplicado.porcentaje > 0) {
                 montoDescuento = Math.round(totalPrecio * (cuponAplicado.porcentaje / 100));
             }
-            const totalFinal = Math.max(0, totalPrecio - montoDescuento);
+            const totalFinal = Math.max(0, totalPrecio - montoDescuento + recargoPersonalizacion);
 
             document.getElementById('floating-total-price').textContent = formatearPrecio(totalFinal);
             document.getElementById('modal-total-price').textContent = formatearPrecio(totalFinal);
 
             const filaSub = document.getElementById('fila-subtotal');
+            const filaPers = document.getElementById('fila-personalizacion');
             const filaDesc = document.getElementById('fila-descuento');
-            if (montoDescuento > 0) {
+
+            if (montoDescuento > 0 || recargoPersonalizacion > 0) {
                 if (filaSub) {
                     filaSub.style.display = 'flex';
                     document.getElementById('modal-subtotal-price').textContent = formatearPrecio(totalPrecio);
                 }
+            } else {
+                if (filaSub) filaSub.style.display = 'none';
+            }
+
+            if (filaPers) {
+                if (recargoPersonalizacion > 0) {
+                    filaPers.style.display = 'flex';
+                    document.getElementById('modal-personalizacion-price').textContent = '+' + formatearPrecio(recargoPersonalizacion);
+                } else {
+                    filaPers.style.display = 'none';
+                }
+            }
+
+            if (montoDescuento > 0) {
                 if (filaDesc) {
                     filaDesc.style.display = 'flex';
                     document.getElementById('label-descuento').textContent = `Descuento (${cuponAplicado.codigo} -${cuponAplicado.porcentaje}%):`;
                     document.getElementById('modal-discount-price').textContent = '-' + formatearPrecio(montoDescuento);
                 }
             } else {
-                if (filaSub) filaSub.style.display = 'none';
                 if (filaDesc) filaDesc.style.display = 'none';
             }
 
@@ -687,8 +738,9 @@
             const tipoEntrega = document.getElementById('cliente-tipo-entrega').value;
             const direccionEnvio = document.getElementById('cliente-direccion').value.trim();
             const metodoPago = document.getElementById('cliente-metodo-pago').value;
-            const personalizacion = document.getElementById('cliente-personalizacion').value.trim();
-            const nota = document.getElementById('cliente-nota').value.trim();
+            const conPersonalizacion = document.getElementById('check-personalizacion')?.checked || false;
+            const personalizacion = conPersonalizacion ? document.getElementById('cliente-personalizacion').value.trim() : '';
+            const nota = conPersonalizacion ? document.getElementById('cliente-nota').value.trim() : '';
             const btnWa = document.getElementById('btn-enviar-wa');
             const btnShare = document.getElementById('btn-share-foto');
 
@@ -701,6 +753,12 @@
             if (tipoEntrega.includes('Envío') && !direccionEnvio) {
                 alert('Por favor ingresa tu dirección y comuna/ciudad para el envío a domicilio.');
                 document.getElementById('cliente-direccion').focus();
+                return;
+            }
+
+            if (conPersonalizacion && !personalizacion) {
+                alert('Por favor escribe el nombre para bordar o estampar en la personalización.');
+                document.getElementById('cliente-personalizacion').focus();
                 return;
             }
 
@@ -717,15 +775,21 @@
                 lineas.push(`• *${cant}x ${prod.nombre}* (${prod.edad}) - ${formatearPrecio(subtotal)}`);
             });
 
+            const recargoPersonalizacion = conPersonalizacion ? COSTO_PERSONALIZACION : 0;
             let descuentoMonto = 0;
             if (cuponAplicado && cuponAplicado.porcentaje > 0) {
                 descuentoMonto = Math.round(subtotalPedido * (cuponAplicado.porcentaje / 100));
             }
-            const totalFinal = Math.max(0, subtotalPedido - descuentoMonto);
+            const totalFinal = Math.max(0, subtotalPedido - descuentoMonto + recargoPersonalizacion);
 
             lineas.push('');
+            if (descuentoMonto > 0 || recargoPersonalizacion > 0) {
+                lineas.push(`Subtotal productos: ${formatearPrecio(subtotalPedido)}`);
+            }
+            if (recargoPersonalizacion > 0) {
+                lineas.push(`✨ Servicio de Personalización: +${formatearPrecio(recargoPersonalizacion)}`);
+            }
             if (descuentoMonto > 0) {
-                lineas.push(`Subtotal: ${formatearPrecio(subtotalPedido)}`);
                 lineas.push(`🎟️ Cupón ${cuponAplicado.codigo} (-${cuponAplicado.porcentaje}%): -${formatearPrecio(descuentoMonto)}`);
             }
             lineas.push(`*Total a Pagar: ${formatearPrecio(totalFinal)}*`);
@@ -739,10 +803,10 @@
                 lineas.push(`🏠 Dirección: ${direccionEnvio}`);
             }
             lineas.push(`💳 Pago: ${metodoPago}`);
-            if (personalizacion) {
-                lineas.push(`✨ Personalización: ${personalizacion}`);
+            if (conPersonalizacion && personalizacion) {
+                lineas.push(`✨ Personalización (+${formatearPrecio(recargoPersonalizacion)}): ${personalizacion}`);
             }
-            if (nota) {
+            if (conPersonalizacion && nota) {
                 lineas.push(`📝 Nota: ${nota}`);
             }
 
@@ -761,6 +825,7 @@
                         tipo_entrega: tipoEntrega,
                         direccion_envio: tipoEntrega.includes('Envío') ? direccionEnvio : '',
                         metodo_pago: metodoPago,
+                        con_personalizacion: conPersonalizacion,
                         personalizacion: personalizacion,
                         cliente_nota: nota,
                         cupon_codigo: cuponAplicado ? cuponAplicado.codigo : ''
