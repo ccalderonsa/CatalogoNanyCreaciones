@@ -1246,12 +1246,11 @@ main.container {
     }
 
     .filters {
-        flex-wrap: nowrap;
-        overflow-x: auto;
+        flex-wrap: wrap;
+        overflow-x: visible;
+        justify-content: center;
         width: 100%;
         padding-bottom: 0.2rem;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
     }
 
     .filters::-webkit-scrollbar {
@@ -2868,48 +2867,91 @@ body {
     /* Barra de herramientas no fija en celular para no tapar la pantalla al bajar */
     .toolbar {
         position: static;
-        padding: 0.45rem 0 0.65rem;
+        padding: 0.55rem 0 0.75rem;
         margin-bottom: 0.85rem;
-        gap: 0.55rem;
-    }
-
-    .search-box {
-        min-width: 0;
+        gap: 0.65rem;
         width: 100%;
     }
 
+    .search-sort-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.55rem;
+        width: 100%;
+    }
+
+    .search-box {
+        flex: none;
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+        display: block;
+        position: relative;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 0.9rem;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 2;
+        line-height: 1;
+    }
+
     .search-box input {
-        padding: 0.6rem 0.9rem 0.6rem 2.4rem;
+        -webkit-appearance: none;
+        appearance: none;
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        min-height: 44px;
+        padding: 0.62rem 0.9rem 0.62rem 2.35rem;
+        font-size: 0.92rem !important;
+        line-height: 1.3;
+        box-sizing: border-box;
+        text-overflow: ellipsis;
     }
 
     .sort-box {
+        flex: none;
         width: 100%;
     }
 
     .sort-box select {
+        width: 100%;
+        min-height: 44px;
         padding: 0.58rem 0.9rem;
+        font-size: 0.9rem !important;
+        box-sizing: border-box;
     }
 
     .toolbar-bottom-row {
         flex-direction: column;
-        align-items: stretch;
-        gap: 0.45rem;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
     }
 
     .filters {
+        display: flex;
+        flex-wrap: wrap !important;
+        overflow-x: visible !important;
+        justify-content: center;
+        width: 100%;
         padding-bottom: 0.15rem;
-        gap: 0.4rem;
+        gap: 0.42rem;
     }
 
     .filter-chip {
-        padding: 0.42rem 0.85rem;
+        padding: 0.42rem 0.8rem;
         font-size: 0.8rem;
+        flex-shrink: 0;
     }
 
     .count {
-        align-self: flex-start;
+        align-self: center;
         font-size: 0.75rem;
-        padding: 0.2rem 0.65rem;
+        padding: 0.22rem 0.75rem;
     }
 
     /* Catálogo en celular: Grilla de 2 columnas estilo tienda móvil */
