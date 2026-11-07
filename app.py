@@ -164,6 +164,7 @@ def init_db():
                 metodo_pago TEXT NOT NULL DEFAULT 'Transferencia Bancaria',
                 cliente_nota TEXT NOT NULL DEFAULT '',
                 personalizacion TEXT NOT NULL DEFAULT '',
+                costo_personalizacion REAL NOT NULL DEFAULT 0,
                 estado TEXT NOT NULL DEFAULT 'Pendiente',
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -181,6 +182,7 @@ def init_db():
             ("metodo_pago", "TEXT NOT NULL DEFAULT 'Transferencia Bancaria'"),
             ("cliente_nota", "TEXT NOT NULL DEFAULT ''"),
             ("personalizacion", "TEXT NOT NULL DEFAULT ''"),
+            ("costo_personalizacion", "REAL NOT NULL DEFAULT 0"),
             ("subtotal", "REAL NOT NULL DEFAULT 0"),
             ("descuento_monto", "REAL NOT NULL DEFAULT 0"),
             ("cupon_usado", "TEXT NOT NULL DEFAULT ''"),
@@ -1135,6 +1137,7 @@ def comprar_productos():
     metodo_pago = str(data.get("metodo_pago", "Transferencia Bancaria")).strip()
     cliente_nota = str(data.get("cliente_nota", "")).strip()
     personalizacion = str(data.get("personalizacion", "")).strip()
+    con_personalizacion = bool(data.get("con_personalizacion", False)) or bool(personalizacion)
     cupon_codigo = str(data.get("cupon_codigo", "")).strip().upper()
 
     if not items or not isinstance(items, dict):
@@ -1196,7 +1199,8 @@ def comprar_productos():
                     descuento_monto = round(subtotal_pedido * (pct / 100.0))
                     cupon_aplicado = f"{cupon_row['codigo']} (-{pct}%)"
 
-            total_pedido = max(0.0, subtotal_pedido - descuento_monto)
+            costo_personalizacion = 2500.0 if con_personalizacion else 0.0
+            total_pedido = max(0.0, subtotal_pedido - descuento_monto + costo_personalizacion)
 
             for item in detalles_pedido:
                 conn.execute(
@@ -1217,9 +1221,9 @@ def comprar_productos():
                     codigo, resumen_titulo, resumen_desc, imagen_collage,
                     items_json, subtotal, descuento_monto, cupon_usado, total,
                     cliente_nombre, cliente_telefono, tipo_entrega, direccion_envio,
-                    metodo_pago, cliente_nota, personalizacion, estado
+                    metodo_pago, cliente_nota, personalizacion, costo_personalizacion, estado
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
                 """,
                 (
                     codigo_pedido,
@@ -1238,6 +1242,7 @@ def comprar_productos():
                     metodo_pago,
                     cliente_nota,
                     personalizacion,
+                    costo_personalizacion,
                 ),
             )
             conn.commit()
