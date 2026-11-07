@@ -36,7 +36,21 @@ DEFAULT_CATEGORIES = [
     "Lonchera",
     "Guarda Muda",
 ]
-ESTADOS_PEDIDO = ["Pendiente", "Pagado", "Entregado", "Anulado"]
+ESTADOS_PEDIDO = ["Pendiente", "Pagado", "Enviado", "Entregado", "Anulado"]
+EMPRESAS_ENVIO = [
+    "Starken",
+    "Chilexpress",
+    "Blue Express",
+    "Correos de Chile",
+    "Reparto Directo",
+]
+URLS_COURIER = {
+    "Starken": "https://www.starken.cl/seguimiento",
+    "Chilexpress": "https://www.chilexpress.cl/",
+    "Blue Express": "https://www.blue.cl/seguimiento/",
+    "Correos de Chile": "https://www.correos.cl/seguimiento-de-envios",
+    "Reparto Directo": "",
+}
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -165,6 +179,9 @@ def init_db():
                 cliente_nota TEXT NOT NULL DEFAULT '',
                 personalizacion TEXT NOT NULL DEFAULT '',
                 costo_personalizacion REAL NOT NULL DEFAULT 0,
+                costo_envio REAL NOT NULL DEFAULT 0,
+                empresa_envio TEXT NOT NULL DEFAULT '',
+                codigo_seguimiento TEXT NOT NULL DEFAULT '',
                 estado TEXT NOT NULL DEFAULT 'Pendiente',
                 creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -183,6 +200,9 @@ def init_db():
             ("cliente_nota", "TEXT NOT NULL DEFAULT ''"),
             ("personalizacion", "TEXT NOT NULL DEFAULT ''"),
             ("costo_personalizacion", "REAL NOT NULL DEFAULT 0"),
+            ("costo_envio", "REAL NOT NULL DEFAULT 0"),
+            ("empresa_envio", "TEXT NOT NULL DEFAULT ''"),
+            ("codigo_seguimiento", "TEXT NOT NULL DEFAULT ''"),
             ("subtotal", "REAL NOT NULL DEFAULT 0"),
             ("descuento_monto", "REAL NOT NULL DEFAULT 0"),
             ("cupon_usado", "TEXT NOT NULL DEFAULT ''"),
@@ -304,7 +324,7 @@ def calcular_metricas_y_reportes(productos_rows, pedidos_rows):
     ingresos_pagados = sum(
         float(p["total"])
         for p in pedidos_rows
-        if p["estado"] in ("Pagado", "Entregado")
+        if p["estado"] in ("Pagado", "Enviado", "Entregado")
     )
 
     ventas_por_producto = {}
@@ -496,10 +516,15 @@ def admin():
         if tel_limpio:
             nombre_cli = d.get("cliente_nombre") or "Cliente"
             ficha_link = f"{base_publica}/pedido/{d['codigo']}"
+            extra_tracking = ""
+            if d.get("codigo_seguimiento"):
+                emp = d.get("empresa_envio") or "Transporte"
+                extra_tracking = f"\n📦 *Despacho ({emp}) - N° Seguimiento:* {d['codigo_seguimiento']}\n"
             texto_wa_cliente = (
                 f"¡Hola {nombre_cli}! 👋 Te escribimos de *Nany Creaciones* respecto a tu "
-                f"Pedido *#{d['codigo']}* (Estado actual: *{d['estado']}*).\n\n"
-                f"Puedes ver el comprobante y seguimiento de tu pedido aquí:\n{ficha_link}"
+                f"Pedido *#{d['codigo']}* (Estado actual: *{d['estado']}*)."
+                f"{extra_tracking}\n"
+                f"Puedes ver el comprobante y seguimiento en vivo de tu pedido aquí:\n{ficha_link}"
             )
             d["wa_cliente_url"] = f"https://wa.me/{tel_limpio}?text={urllib.parse.quote(texto_wa_cliente)}"
         else:
@@ -519,6 +544,7 @@ def admin():
         ranking_productos=ranking_productos,
         ranking_categorias=ranking_categorias,
         estados_pedido=ESTADOS_PEDIDO,
+        empresas_envio=EMPRESAS_ENVIO,
         edad_filtro=edad_filtro,
         edades=categorias_actuales,
         cupones=cupones_actuales,
@@ -1010,6 +1036,8 @@ def agregar_producto():
 @admin_required
 def cambiar_estado_pedido(codigo: str):
     nuevo_estado = request.form.get("estado", "").strip()
+    empresa_envio = request.form.get("empresa_envio", "").strip()
+    codigo_seguimiento = request.form.get("codigo_seguimiento", "").strip()
     if nuevo_estado not in ESTADOS_PEDIDO:
         flash("Estado de pedido no válido.", "error")
         return redirect(url_for("admin", tab="pedidos"))
@@ -1053,16 +1081,19 @@ def cambiar_estado_pedido(codigo: str):
             )
             return redirect(url_for("admin", tab="pedidos"))
 
-        if estado_anterior != nuevo_estado:
-            conn.execute(
-                "UPDATE pedidos SET estado = ? WHERE codigo = ?",
-                (nuevo_estado, codigo),
-            )
-            conn.commit()
-            flash(
-                f"Estado del pedido #{codigo} actualizado a '{nuevo_estado}'.",
-                "success",
-            )
+        conn.execute(
+            """
+            UPDATE pedidos
+            SET estado = ?, empresa_envio = ?, codigo_seguimiento = ?
+            WHERE codigo = ?
+            """,
+            (nuevo_estado, empresa_envio, codigo_seguimiento, codigo),
+        )
+        conn.commit()
+        flash(
+            f"Pedido #{codigo} actualizado (Estado: '{nuevo_estado}').",
+            "success",
+        )
 
     return redirect(url_for("admin", tab="pedidos"))
 
@@ -1100,9 +1131,31 @@ def generar_collage_pedido(detalles: list[dict]) -> str:
     return nombre_collage
 
 
+@app.route("/api/rastrear", methods=["POST"])
+def api_rastrear_pedido():
+    """Verifica si existe un código de pedido para redirigir al seguimiento en vivo."""
+    data = request.get_json(silent=True) or {}
+    codigo_raw = str(data.get("codigo", "")).strip().lower()
+    codigo_limpio = re.sub(r"[^a-z0-9]", "", codigo_raw)
+    if not codigo_limpio:
+        return jsonify({"ok": False, "error": "Ingresa tu código de pedido (ej: a1b2c3d4)."}), 400
+
+    with get_db_connection() as conn:
+        pedido = conn.execute(
+            "SELECT codigo FROM pedidos WHERE LOWER(codigo) = ?", (codigo_limpio,)
+        ).fetchone()
+    if not pedido:
+        return jsonify({
+            "ok": False,
+            "error": f"No encontramos ningún pedido activo con el código #{codigo_limpio}.",
+        }), 404
+
+    return jsonify({"ok": True, "url": url_for("ver_pedido", codigo=pedido["codigo"])})
+
+
 @app.route("/pedido/<codigo>", methods=["GET"])
 def ver_pedido(codigo: str):
-    """Comprobante oficial y seguimiento en vivo del pedido con datos de transferencia."""
+    """Comprobante oficial y seguimiento en vivo del pedido con datos de transferencia y tracking."""
     with get_db_connection() as conn:
         pedido = conn.execute(
             "SELECT * FROM pedidos WHERE codigo = ?", (codigo,)
@@ -1114,6 +1167,8 @@ def ver_pedido(codigo: str):
     base_publica = get_public_base_url()
     whatsapp = get_whatsapp_number()
     datos_transferencia = get_datos_transferencia()
+    emp_envio = pedido["empresa_envio"] if "empresa_envio" in pedido.keys() else ""
+    url_courier = URLS_COURIER.get(emp_envio, "")
 
     return render_template(
         "pedido.html",
@@ -1122,6 +1177,7 @@ def ver_pedido(codigo: str):
         base_publica=base_publica,
         whatsapp=whatsapp,
         datos_transferencia=datos_transferencia,
+        url_courier=url_courier,
     )
 
 
@@ -1200,7 +1256,8 @@ def comprar_productos():
                     cupon_aplicado = f"{cupon_row['codigo']} (-{pct}%)"
 
             costo_personalizacion = 1500.0 if con_personalizacion else 0.0
-            total_pedido = max(0.0, subtotal_pedido - descuento_monto + costo_personalizacion)
+            costo_envio = 3000.0 if "Envío" in tipo_entrega else 0.0
+            total_pedido = max(0.0, subtotal_pedido - descuento_monto + costo_personalizacion + costo_envio)
 
             for item in detalles_pedido:
                 conn.execute(
@@ -1221,9 +1278,9 @@ def comprar_productos():
                     codigo, resumen_titulo, resumen_desc, imagen_collage,
                     items_json, subtotal, descuento_monto, cupon_usado, total,
                     cliente_nombre, cliente_telefono, tipo_entrega, direccion_envio,
-                    metodo_pago, cliente_nota, personalizacion, costo_personalizacion, estado
+                    metodo_pago, cliente_nota, personalizacion, costo_personalizacion, costo_envio, estado
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente')
                 """,
                 (
                     codigo_pedido,
@@ -1243,6 +1300,7 @@ def comprar_productos():
                     cliente_nota,
                     personalizacion,
                     costo_personalizacion,
+                    costo_envio,
                 ),
             )
             conn.commit()
