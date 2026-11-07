@@ -16,7 +16,7 @@
     <meta property="og:image:height" content="800">
 
     <link rel="icon" type="image/jpeg" href="{{ url_for('logo_imagen') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=12">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=13">
 </head>
 <body>
     <nav class="top-nav">
@@ -53,7 +53,7 @@
                     ⚠️ <strong>Pedido Anulado:</strong> Este pedido fue cancelado y las unidades fueron devueltas al inventario.
                 </div>
             {% else %}
-                {% set paso = 1 if pedido['estado'] == 'Pendiente' else (2 if pedido['estado'] == 'Pagado' else 3) %}
+                {% set paso = 1 if pedido['estado'] == 'Pendiente' else (2 if pedido['estado'] == 'Pagado' else (3 if pedido['estado'] == 'Enviado' else 4)) %}
                 <div class="tracking-stepper">
                     <div class="step-item {{ 'step-done' if paso >= 1 else '' }} {{ 'step-current' if paso == 1 else '' }}">
                         <div class="step-circle">1</div>
@@ -74,8 +74,48 @@
                     <div class="step-item {{ 'step-done' if paso >= 3 else '' }} {{ 'step-current' if paso == 3 else '' }}">
                         <div class="step-circle">3</div>
                         <div class="step-label">
-                            <strong>Entregado / Enviado</strong>
+                            <strong>Despachado</strong>
+                            <span>En camino a destino</span>
+                        </div>
+                    </div>
+                    <div class="step-line {{ 'line-done' if paso >= 4 else '' }}"></div>
+                    <div class="step-item {{ 'step-done' if paso >= 4 else '' }} {{ 'step-current' if paso == 4 else '' }}">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">
+                            <strong>Entregado</strong>
                             <span>Pedido finalizado</span>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Tarjeta de Tracking de Envío / Courier si tiene datos de seguimiento -->
+            {% if ('codigo_seguimiento' in pedido.keys() and pedido['codigo_seguimiento']) or ('empresa_envio' in pedido.keys() and pedido['empresa_envio']) %}
+                <div class="receipt-box" style="margin-bottom: 1.25rem; background: #f0fdf4; border-color: #bbf7d0;">
+                    <h3 style="margin-bottom: 0.45rem;">🚚 Seguimiento de tu Envío (Tracking)</h3>
+                    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.85rem;">
+                        <div>
+                            <p style="font-size: 0.92rem; margin-bottom: 0.2rem;">
+                                <strong>Empresa de Transporte:</strong> {{ pedido['empresa_envio'] if pedido['empresa_envio'] else 'Despacho Directo' }}
+                            </p>
+                            {% if pedido['codigo_seguimiento'] %}
+                                <p style="font-size: 0.95rem;">
+                                    <strong>N° de Seguimiento / OT:</strong>
+                                    <code id="codigo-tracking-txt" style="background: #fff; padding: 0.2rem 0.55rem; border-radius: 8px; border: 1px solid #86efac; font-weight: 800; color: #166534;">{{ pedido['codigo_seguimiento'] }}</code>
+                                </p>
+                            {% endif %}
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            {% if pedido['codigo_seguimiento'] %}
+                                <button type="button" class="btn-secondary btn-sm" id="btn-copiar-tracking" onclick="copiarTracking()">
+                                    📋 Copiar N° Seguimiento
+                                </button>
+                            {% endif %}
+                            {% if url_courier %}
+                                <a href="{{ url_courier }}" target="_blank" class="btn-primary btn-sm" style="text-decoration: none;">
+                                    🔍 Rastrear en {{ pedido['empresa_envio'] }} →
+                                </a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -105,7 +145,8 @@
 
                     <div class="receipt-totals">
                         {% set costo_pers = pedido['costo_personalizacion'] if 'costo_personalizacion' in pedido.keys() and pedido['costo_personalizacion'] else (1500 if pedido['personalizacion'] else 0) %}
-                        {% if (pedido['descuento_monto'] and pedido['descuento_monto'] > 0) or costo_pers > 0 %}
+                        {% set costo_env = pedido['costo_envio'] if 'costo_envio' in pedido.keys() and pedido['costo_envio'] else (3000 if 'Envío' in (pedido['tipo_entrega'] or '') else 0) %}
+                        {% if (pedido['descuento_monto'] and pedido['descuento_monto'] > 0) or costo_pers > 0 or costo_env > 0 %}
                             <div class="receipt-total-row">
                                 <span>Subtotal productos:</span>
                                 <span>${{ "{:,.0f}".format(pedido['subtotal']).replace(",", ".") }}</span>
@@ -115,6 +156,12 @@
                             <div class="receipt-total-row" style="color: var(--primary-hover); font-weight: 700;">
                                 <span>✨ Personalización:</span>
                                 <span>+${{ "{:,.0f}".format(costo_pers).replace(",", ".") }}</span>
+                            </div>
+                        {% endif %}
+                        {% if costo_env > 0 %}
+                            <div class="receipt-total-row" style="color: var(--primary-hover); font-weight: 700;">
+                                <span>🚚 Envío a domicilio:</span>
+                                <span>+${{ "{:,.0f}".format(costo_env).replace(",", ".") }}</span>
                             </div>
                         {% endif %}
                         {% if pedido['descuento_monto'] and pedido['descuento_monto'] > 0 %}
@@ -190,6 +237,17 @@
                 const original = btn.textContent;
                 btn.textContent = '✓ ¡Datos copiados al portapapeles!';
                 setTimeout(() => { btn.textContent = original; }, 2500);
+            });
+        }
+
+        function copiarTracking() {
+            const el = document.getElementById('codigo-tracking-txt');
+            const btn = document.getElementById('btn-copiar-tracking');
+            if (!el) return;
+            navigator.clipboard.writeText(el.innerText).then(() => {
+                const original = btn.textContent;
+                btn.textContent = '✓ ¡Copiado!';
+                setTimeout(() => { btn.textContent = original; }, 2000);
             });
         }
     </script>
