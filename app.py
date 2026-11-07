@@ -1,10 +1,12 @@
 import csv
 from functools import wraps
+import hmac
 import io
 import json
 import os
 import re
 import sqlite3
+import time
 import unicodedata
 import urllib.parse
 import urllib.request
@@ -55,7 +57,20 @@ URLS_COURIER = {
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8 MB max
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.secret_key = os.environ.get("SECRET_KEY", "delantales-cocina-secret-key")
+
+MAX_LOGIN_ATTEMPTS = 5
+LOGIN_LOCKOUT_SECONDS = 15 * 60  # 15 minutos de bloqueo
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -213,6 +228,16 @@ def init_db():
                 conn.execute(
                     f"ALTER TABLE pedidos ADD COLUMN {col_name} {col_def}"
                 )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS intentos_login (
+                ip TEXT PRIMARY KEY,
+                intentos INTEGER NOT NULL DEFAULT 0,
+                bloqueado_hasta REAL NOT NULL DEFAULT 0
+            )
+            """
+        )
+
         # Eliminar pedidos que hayan quedado en estado 'Anulado'
         conn.execute("DELETE FROM pedidos WHERE estado = 'Anulado'")
         conn.commit()
@@ -458,19 +483,83 @@ def validar_cupon():
     })
 
 
+def obtener_ip_cliente() -> str:
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "desconocido"
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    """Pantalla de acceso con contraseña/PIN para proteger el panel de administración."""
+    """Pantalla de acceso con contraseña/PIN y bloqueo automático contra fuerza bruta."""
     if session.get("admin_logged_in"):
         return redirect(url_for("admin"))
 
-    if request.method == "POST":
-        pin_ingresado = request.form.get("pin", "").strip()
-        if pin_ingresado == get_admin_pin():
-            session["admin_logged_in"] = True
-            flash("¡Bienvenida al Panel de Administración de Nany Creaciones!", "success")
-            return redirect(url_for("admin"))
-        flash("Contraseña / PIN incorrecto. Inténtalo nuevamente.", "error")
+    ip_cliente = obtener_ip_cliente()
+    ahora = time.time()
+
+    with get_db_connection() as conn:
+        registro = conn.execute(
+            "SELECT intentos, bloqueado_hasta FROM intentos_login WHERE ip = ?",
+            (ip_cliente,),
+        ).fetchone()
+
+        if registro and registro["bloqueado_hasta"] > ahora:
+            minutos_restantes = max(1, int(round((registro["bloqueado_hasta"] - ahora) / 60)))
+            flash(
+                f"🔒 Demasiados intentos fallidos. El acceso está bloqueado temporalmente por seguridad. "
+                f"Intenta nuevamente en {minutos_restantes} minuto(s).",
+                "error",
+            )
+            return render_template("login.html")
+
+        if request.method == "POST":
+            pin_ingresado = request.form.get("pin", "").strip()
+            pin_real = get_admin_pin()
+
+            if hmac.compare_digest(pin_ingresado.encode("utf-8"), pin_real.encode("utf-8")):
+                conn.execute("DELETE FROM intentos_login WHERE ip = ?", (ip_cliente,))
+                conn.commit()
+                session["admin_logged_in"] = True
+                flash("¡Bienvenida al Panel de Administración de Nany Creaciones!", "success")
+                return redirect(url_for("admin"))
+
+            intentos_previos = registro["intentos"] if registro else 0
+            if registro and registro["bloqueado_hasta"] <= ahora and registro["bloqueado_hasta"] > 0:
+                intentos_previos = 0
+
+            nuevos_intentos = intentos_previos + 1
+            if nuevos_intentos >= MAX_LOGIN_ATTEMPTS:
+                bloqueo = ahora + LOGIN_LOCKOUT_SECONDS
+                conn.execute(
+                    """
+                    INSERT INTO intentos_login (ip, intentos, bloqueado_hasta)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(ip) DO UPDATE SET intentos = excluded.intentos, bloqueado_hasta = excluded.bloqueado_hasta
+                    """,
+                    (ip_cliente, nuevos_intentos, bloqueo),
+                )
+                conn.commit()
+                flash(
+                    "🔒 Se alcanzó el límite de 5 intentos fallidos. Acceso bloqueado por 15 minutos.",
+                    "error",
+                )
+            else:
+                restantes = MAX_LOGIN_ATTEMPTS - nuevos_intentos
+                conn.execute(
+                    """
+                    INSERT INTO intentos_login (ip, intentos, bloqueado_hasta)
+                    VALUES (?, ?, 0)
+                    ON CONFLICT(ip) DO UPDATE SET intentos = excluded.intentos, bloqueado_hasta = 0
+                    """,
+                    (ip_cliente, nuevos_intentos),
+                )
+                conn.commit()
+                flash(
+                    f"Contraseña / PIN incorrecto. Te quedan {restantes} intento(s) antes del bloqueo temporal.",
+                    "error",
+                )
 
     return render_template("login.html")
 
