@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nany Creaciones | Catálogo Oficial de Delantales, Morrales y Accesorios</title>
     <link rel="icon" type="image/jpeg" href="{{ url_for('logo_imagen') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=12">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=13">
 </head>
 <body>
     <!-- Barra Superior Elegante -->
@@ -17,11 +17,16 @@
                 <span class="brand-divider">|</span>
                 <span class="brand-tagline">Catálogo Exclusivo</span>
             </div>
-            <button class="btn-cart-header" onclick="abrirModalPedido()">
-                <span class="cart-icon">🛍️</span>
-                <span>Mi Pedido</span>
-                <span class="cart-count-pill" id="header-cart-count">0</span>
-            </button>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <button type="button" class="btn-secondary btn-sm" onclick="abrirModalRastrear()" title="Rastrear estado de un pedido">
+                    📦 Seguimiento
+                </button>
+                <button class="btn-cart-header" onclick="abrirModalPedido()">
+                    <span class="cart-icon">🛍️</span>
+                    <span>Mi Pedido</span>
+                    <span class="cart-count-pill" id="header-cart-count">0</span>
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -236,6 +241,10 @@
                     <span>✨ Servicio de Personalización:</span>
                     <span id="modal-personalizacion-price">+$1.500</span>
                 </div>
+                <div class="summary-line" id="fila-envio" style="display: none; color: var(--primary-hover); font-weight: 700;">
+                    <span>🚚 Envío a domicilio:</span>
+                    <span id="modal-envio-price">+$3.000</span>
+                </div>
                 <div class="summary-line summary-discount" id="fila-descuento" style="display: none;">
                     <span id="label-descuento">Descuento:</span>
                     <span id="modal-discount-price">-$0</span>
@@ -276,7 +285,7 @@
                             <span class="option-choice-icon">📍</span>
                             <div class="option-choice-text">
                                 <strong>Retiro / Punto de encuentro</strong>
-                                <span>Coordinamos día y lugar de entrega</span>
+                                <span>Coordinamos día y lugar (Sin costo)</span>
                             </div>
                         </button>
                         <button
@@ -287,8 +296,8 @@
                         >
                             <span class="option-choice-icon">🚚</span>
                             <div class="option-choice-text">
-                                <strong>Envío a domicilio</strong>
-                                <span>Despacho a tu dirección o sucursal</span>
+                                <strong>Envío a domicilio (+$3.000)</strong>
+                                <span>Despacho a tu dirección (+$3.000)</span>
                             </div>
                         </button>
                     </div>
@@ -398,11 +407,43 @@
         </div>
     </div>
 
+    <!-- Modal de Seguimiento de Pedido (Tracking) -->
+    <div id="modal-rastrear" class="modal-backdrop" onclick="if(event.target === this) cerrarModalRastrear()">
+        <div class="modal" style="max-width: 440px;">
+            <div class="sheet-handle"></div>
+            <div class="modal-header">
+                <div>
+                    <h2>📦 Rastrear mi Pedido</h2>
+                    <p class="modal-subtitle">Consulta el estado en vivo y número de seguimiento de tu compra</p>
+                </div>
+                <button type="button" class="btn-close" onclick="cerrarModalRastrear()">&times;</button>
+            </div>
+            <form onsubmit="buscarSeguimientoPedido(event)" class="form-grid">
+                <div class="form-group">
+                    <label for="input-codigo-rastreo">🔍 Código de Pedido *</label>
+                    <input
+                        type="text"
+                        id="input-codigo-rastreo"
+                        placeholder="Ej: a1b2c3d4"
+                        maxlength="20"
+                        required
+                    >
+                </div>
+                <div id="rastreo-error" class="coupon-msg coupon-err" style="display: none;"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="cerrarModalRastrear()">Cerrar</button>
+                    <button type="submit" class="btn-primary" id="btn-buscar-rastreo">Ver Seguimiento →</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         let CATALOGO_PRODUCTOS = {{ todos_productos | tojson }};
         const WHATSAPP_NUMBER = {{ whatsapp | tojson }};
         const STORAGE_KEY = 'pedido_delantales_v1';
         const COSTO_PERSONALIZACION = 1500;
+        const COSTO_ENVIO = 3000;
         let categoriaSeleccionada = {{ edad_filtro | tojson }};
         let cuponAplicado = null; // { codigo, porcentaje }
 
@@ -566,20 +607,25 @@
             const conPersonalizacion = (totalUnidades > 0 && chkPers && chkPers.checked);
             const recargoPersonalizacion = conPersonalizacion ? COSTO_PERSONALIZACION : 0;
 
+            const tipoEntregaActual = document.getElementById('cliente-tipo-entrega')?.value || '';
+            const conEnvioDomicilio = (totalUnidades > 0 && tipoEntregaActual.includes('Envío'));
+            const recargoEnvio = conEnvioDomicilio ? COSTO_ENVIO : 0;
+
             let montoDescuento = 0;
             if (cuponAplicado && cuponAplicado.porcentaje > 0) {
                 montoDescuento = Math.round(totalPrecio * (cuponAplicado.porcentaje / 100));
             }
-            const totalFinal = Math.max(0, totalPrecio - montoDescuento + recargoPersonalizacion);
+            const totalFinal = Math.max(0, totalPrecio - montoDescuento + recargoPersonalizacion + recargoEnvio);
 
             document.getElementById('floating-total-price').textContent = formatearPrecio(totalFinal);
             document.getElementById('modal-total-price').textContent = formatearPrecio(totalFinal);
 
             const filaSub = document.getElementById('fila-subtotal');
             const filaPers = document.getElementById('fila-personalizacion');
+            const filaEnvio = document.getElementById('fila-envio');
             const filaDesc = document.getElementById('fila-descuento');
 
-            if (montoDescuento > 0 || recargoPersonalizacion > 0) {
+            if (montoDescuento > 0 || recargoPersonalizacion > 0 || recargoEnvio > 0) {
                 if (filaSub) {
                     filaSub.style.display = 'flex';
                     document.getElementById('modal-subtotal-price').textContent = formatearPrecio(totalPrecio);
@@ -594,6 +640,15 @@
                     document.getElementById('modal-personalizacion-price').textContent = '+' + formatearPrecio(recargoPersonalizacion);
                 } else {
                     filaPers.style.display = 'none';
+                }
+            }
+
+            if (filaEnvio) {
+                if (recargoEnvio > 0) {
+                    filaEnvio.style.display = 'flex';
+                    document.getElementById('modal-envio-price').textContent = '+' + formatearPrecio(recargoEnvio);
+                } else {
+                    filaEnvio.style.display = 'none';
                 }
             }
 
@@ -633,6 +688,56 @@
             const grupoDir = document.getElementById('grupo-direccion');
             if (grupoDir) {
                 grupoDir.style.display = tipo.includes('Envío') ? 'flex' : 'none';
+            }
+            actualizarInterfaz();
+        }
+
+        function abrirModalRastrear() {
+            const errEl = document.getElementById('rastreo-error');
+            if (errEl) errEl.style.display = 'none';
+            document.getElementById('modal-rastrear').classList.add('open');
+            setTimeout(() => document.getElementById('input-codigo-rastreo')?.focus(), 100);
+        }
+
+        function cerrarModalRastrear() {
+            document.getElementById('modal-rastrear').classList.remove('open');
+        }
+
+        async function buscarSeguimientoPedido(e) {
+            e.preventDefault();
+            const input = document.getElementById('input-codigo-rastreo');
+            const errEl = document.getElementById('rastreo-error');
+            const btn = document.getElementById('btn-buscar-rastreo');
+            const codigo = (input?.value || '').trim();
+            if (!codigo) return;
+
+            btn.disabled = true;
+            btn.textContent = 'Buscando...';
+            if (errEl) errEl.style.display = 'none';
+
+            try {
+                const resp = await fetch('/api/rastrear', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ codigo })
+                });
+                const data = await resp.json();
+                if (resp.ok && data.ok && data.url) {
+                    window.location.href = data.url;
+                } else {
+                    if (errEl) {
+                        errEl.style.display = 'block';
+                        errEl.textContent = data.error || 'No se encontró el pedido.';
+                    }
+                }
+            } catch (err) {
+                if (errEl) {
+                    errEl.style.display = 'block';
+                    errEl.textContent = 'Error de conexión al consultar el pedido.';
+                }
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Ver Seguimiento →';
             }
         }
 
@@ -776,18 +881,22 @@
             });
 
             const recargoPersonalizacion = conPersonalizacion ? COSTO_PERSONALIZACION : 0;
+            const recargoEnvio = tipoEntrega.includes('Envío') ? COSTO_ENVIO : 0;
             let descuentoMonto = 0;
             if (cuponAplicado && cuponAplicado.porcentaje > 0) {
                 descuentoMonto = Math.round(subtotalPedido * (cuponAplicado.porcentaje / 100));
             }
-            const totalFinal = Math.max(0, subtotalPedido - descuentoMonto + recargoPersonalizacion);
+            const totalFinal = Math.max(0, subtotalPedido - descuentoMonto + recargoPersonalizacion + recargoEnvio);
 
             lineas.push('');
-            if (descuentoMonto > 0 || recargoPersonalizacion > 0) {
+            if (descuentoMonto > 0 || recargoPersonalizacion > 0 || recargoEnvio > 0) {
                 lineas.push(`Subtotal productos: ${formatearPrecio(subtotalPedido)}`);
             }
             if (recargoPersonalizacion > 0) {
                 lineas.push(`✨ Servicio de Personalización: +${formatearPrecio(recargoPersonalizacion)}`);
+            }
+            if (recargoEnvio > 0) {
+                lineas.push(`🚚 Envío a domicilio: +${formatearPrecio(recargoEnvio)}`);
             }
             if (descuentoMonto > 0) {
                 lineas.push(`🎟️ Cupón ${cuponAplicado.codigo} (-${cuponAplicado.porcentaje}%): -${formatearPrecio(descuentoMonto)}`);
@@ -798,7 +907,7 @@
             if (telefono) {
                 lineas.push(`📱 Teléfono: ${telefono}`);
             }
-            lineas.push(`🚚 Entrega: ${tipoEntrega}`);
+            lineas.push(`🚚 Entrega: ${tipoEntrega}${recargoEnvio > 0 ? ' (+' + formatearPrecio(recargoEnvio) + ')' : ''}`);
             if (tipoEntrega.includes('Envío') && direccionEnvio) {
                 lineas.push(`🏠 Dirección: ${direccionEnvio}`);
             }
