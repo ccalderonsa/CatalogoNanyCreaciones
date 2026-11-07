@@ -1646,6 +1646,11 @@ main.container {
     color: #0f766e;
 }
 
+.status-enviado {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
 .status-entregado {
     background: #d8f3dc;
     color: #1b4332;
