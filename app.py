@@ -253,7 +253,11 @@ def get_public_base_url() -> str:
     except Exception:
         pass
     base = request.url_root.rstrip("/")
-    if "trycloudflare.com" in base:
+    if (
+        "trycloudflare.com" in base
+        or "pythonanywhere.com" in base
+        or request.headers.get("X-Forwarded-Proto", "") == "https"
+    ):
         return base.replace("http://", "https://")
     return base
 
@@ -428,6 +432,7 @@ def validar_cupon():
         "ok": True,
         "codigo": row["codigo"],
         "porcentaje": int(row["porcentaje"]),
+        "mensaje": f"Cupón {row['codigo']} aplicado (-{row['porcentaje']}%)",
     })
 
 
