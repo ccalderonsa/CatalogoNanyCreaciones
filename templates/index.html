@@ -234,7 +234,7 @@
                 </div>
                 <div class="summary-line" id="fila-personalizacion" style="display: none; color: var(--primary-hover); font-weight: 700;">
                     <span>✨ Servicio de Personalización:</span>
-                    <span id="modal-personalizacion-price">+$2.500</span>
+                    <span id="modal-personalizacion-price">+$1.500</span>
                 </div>
                 <div class="summary-line summary-discount" id="fila-descuento" style="display: none;">
                     <span id="label-descuento">Descuento:</span>
@@ -348,7 +348,7 @@
                     <div class="checkout-section-title">4. ¿Deseas estampar nombre al delantal?</div>
                     <label class="checkbox-row" for="check-personalizacion" style="margin-bottom: 0.2rem;">
                         <input type="checkbox" id="check-personalizacion" onchange="togglePersonalizacion()">
-                        <span>✨ <strong>Agregar Nombre Estampado al delantal</strong> (+$2.500 adicional)</span>
+                        <span>✨ <strong>Agregar Nombre Estampado al delantal</strong> (+$1.500 adicional)</span>
                     </label>
                     <div id="contenedor-personalizacion" class="form-grid" style="gap: 0.75rem; display: none; margin-top: 0.8rem;">
                         <div class="form-group">
@@ -402,7 +402,7 @@
         let CATALOGO_PRODUCTOS = {{ todos_productos | tojson }};
         const WHATSAPP_NUMBER = {{ whatsapp | tojson }};
         const STORAGE_KEY = 'pedido_delantales_v1';
-        const COSTO_PERSONALIZACION = 2500;
+        const COSTO_PERSONALIZACION = 1500;
         let categoriaSeleccionada = {{ edad_filtro | tojson }};
         let cuponAplicado = null; // { codigo, porcentaje }
 
