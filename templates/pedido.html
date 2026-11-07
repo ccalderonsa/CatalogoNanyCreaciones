@@ -104,7 +104,7 @@
                     </ul>
 
                     <div class="receipt-totals">
-                        {% set costo_pers = pedido['costo_personalizacion'] if 'costo_personalizacion' in pedido.keys() and pedido['costo_personalizacion'] else (2500 if pedido['personalizacion'] else 0) %}
+                        {% set costo_pers = pedido['costo_personalizacion'] if 'costo_personalizacion' in pedido.keys() and pedido['costo_personalizacion'] else (1500 if pedido['personalizacion'] else 0) %}
                         {% if (pedido['descuento_monto'] and pedido['descuento_monto'] > 0) or costo_pers > 0 %}
                             <div class="receipt-total-row">
                                 <span>Subtotal productos:</span>
