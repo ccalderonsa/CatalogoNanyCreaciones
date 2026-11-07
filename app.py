@@ -1199,7 +1199,7 @@ def comprar_productos():
                     descuento_monto = round(subtotal_pedido * (pct / 100.0))
                     cupon_aplicado = f"{cupon_row['codigo']} (-{pct}%)"
 
-            costo_personalizacion = 2500.0 if con_personalizacion else 0.0
+            costo_personalizacion = 1500.0 if con_personalizacion else 0.0
             total_pedido = max(0.0, subtotal_pedido - descuento_monto + costo_personalizacion)
 
             for item in detalles_pedido:
