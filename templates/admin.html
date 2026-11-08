@@ -319,7 +319,45 @@
                                         {% if ped.get('codigo_seguimiento') %}
                                             <span class="meta-pill meta-pill-coupon">📦 {{ ped.get('empresa_envio') or 'Tracking' }}: {{ ped.get('codigo_seguimiento') }}</span>
                                         {% endif %}
+                                        {% if ped.get('comprobante_pago') %}
+                                            <span class="meta-pill" style="background: #dcfce7; color: #166534; border: 1px solid #86efac; font-weight: 800;">
+                                                🧾 Comprobante Subido{{ ' (' ~ ped.get('comprobante_fecha') ~ ')' if ped.get('comprobante_fecha') else '' }}
+                                            </span>
+                                        {% endif %}
                                     </div>
+                                    {% if ped.get('comprobante_pago') %}
+                                        <div style="margin-top: 0.45rem; padding: 0.55rem 0.75rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                                <img
+                                                    src="{{ url_for('static', filename='uploads/' ~ ped['comprobante_pago']) }}"
+                                                    alt="Comprobante Pedido #{{ ped['codigo'] }}"
+                                                    class="clickable-image"
+                                                    onclick="verImagenAdmin('{{ url_for('static', filename='uploads/' ~ ped['comprobante_pago']) }}', 'Comprobante de Pago — Pedido #{{ ped['codigo'] }}')"
+                                                    style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #86efac; cursor: pointer;"
+                                                >
+                                                <div style="font-size: 0.84rem;">
+                                                    <strong style="color: #166534; display: block;">🧾 Comprobante de Transferencia Adjunto</strong>
+                                                    <button
+                                                        type="button"
+                                                        onclick="verImagenAdmin('{{ url_for('static', filename='uploads/' ~ ped['comprobante_pago']) }}', 'Comprobante de Pago — Pedido #{{ ped['codigo'] }}')"
+                                                        style="background: none; border: none; padding: 0; color: var(--primary-hover); font-weight: 700; font-size: 0.82rem; cursor: pointer; text-decoration: underline;"
+                                                    >
+                                                        🔍 Ver foto del comprobante en grande
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {% if ped['estado'] == 'Pendiente' %}
+                                                <form action="{{ url_for('cambiar_estado_pedido', codigo=ped['codigo']) }}" method="POST" style="margin: 0;">
+                                                    <input type="hidden" name="estado" value="Pagado">
+                                                    <input type="hidden" name="empresa_envio" value="{{ ped.get('empresa_envio', '') }}">
+                                                    <input type="hidden" name="codigo_seguimiento" value="{{ ped.get('codigo_seguimiento', '') }}">
+                                                    <button type="submit" class="btn-primary btn-sm" style="background: #16a34a; padding: 0.38rem 0.8rem; font-size: 0.8rem;">
+                                                        ✅ Aprobar Pago
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
                                     {% if ped['direccion_envio'] %}
                                         <div style="margin-top: 0.25rem; font-size: 0.86rem;">
                                             🏠 <strong>Dirección de Envío:</strong> {{ ped['direccion_envio'] }}
@@ -546,21 +584,99 @@
                 {% endif %}
             </div>
 
-            <!-- Datos Bancarios para Transferencia -->
+            <!-- Portal Bancario y Link de Pago en Línea -->
             <div class="whatsapp-config-card" style="flex-direction: column; align-items: stretch;">
                 <div>
-                    <h3>🏦 Datos Bancarios para Transferencia</h3>
-                    <p>Estos datos se muestran automáticamente al cliente en su comprobante de pedido con un botón para copiar en 1 clic.</p>
+                    <h3>🏦 Portal de Pago en Línea y Datos de Transferencia</h3>
+                    <p>Configura tus datos bancarios separados para que el cliente pueda copiar cada campo (RUT, Cuenta, Banco, Monto) con 1 toque y subir su comprobante directamente en la web.</p>
                 </div>
-                <form action="{{ url_for('guardar_datos_transferencia') }}" method="POST" style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%;">
-                    <textarea
-                        name="datos_transferencia"
-                        rows="5"
-                        style="width: 100%; padding: 0.85rem; border-radius: 14px; border: 1.5px solid #ced4da; font-family: inherit; font-size: 0.92rem;"
-                        placeholder="Banco, Tipo de Cuenta, Número, Nombre, RUT y Correo..."
-                    >{{ datos_transferencia }}</textarea>
+                <form action="{{ url_for('guardar_datos_transferencia') }}" method="POST" style="display: flex; flex-direction: column; gap: 0.85rem; width: 100%; margin-top: 0.5rem;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">👤 Nombre del Titular</label>
+                            <input
+                                type="text"
+                                name="banco_titular"
+                                value="{{ portal_bancario['banco_titular'] if portal_bancario else '' }}"
+                                placeholder="Ej: Nany Creaciones / Tu Nombre"
+                                style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #ced4da; font-size: 0.9rem;"
+                            >
+                        </div>
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">🪪 RUT del Titular</label>
+                            <input
+                                type="text"
+                                name="banco_rut"
+                                value="{{ portal_bancario['banco_rut'] if portal_bancario else '' }}"
+                                placeholder="Ej: 12.345.678-9"
+                                style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #ced4da; font-size: 0.9rem;"
+                            >
+                        </div>
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">🏦 Banco / Institución</label>
+                            <input
+                                type="text"
+                                name="banco_nombre"
+                                value="{{ portal_bancario['banco_nombre'] if portal_bancario else '' }}"
+                                placeholder="Ej: BancoEstado, Santander, Mercado Pago..."
+                                style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #ced4da; font-size: 0.9rem;"
+                            >
+                        </div>
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">💳 Tipo de Cuenta</label>
+                            <input
+                                type="text"
+                                name="banco_tipo_cuenta"
+                                value="{{ portal_bancario['banco_tipo_cuenta'] if portal_bancario else '' }}"
+                                placeholder="Ej: CuentaRUT / Cuenta Vista / Corriente"
+                                style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #ced4da; font-size: 0.9rem;"
+                            >
+                        </div>
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">🔢 Número de Cuenta</label>
+                            <input
+                                type="text"
+                                name="banco_numero_cuenta"
+                                value="{{ portal_bancario['banco_numero_cuenta'] if portal_bancario else '' }}"
+                                placeholder="Ej: 12345678"
+                                style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #ced4da; font-size: 0.9rem;"
+                            >
+                        </div>
+                        <div>
+                            <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">✉️ Correo de Confirmación</label>
+                            <input
+                                type="email"
+                                name="banco_correo"
+                                value="{{ portal_bancario['banco_correo'] if portal_bancario else '' }}"
+                                placeholder="Ej: pagos@nanycreaciones.cl"
+                                style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #ced4da; font-size: 0.9rem;"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">🔗 Link de Cobro en Línea Directo (Opcional — Slach, Mercado Pago, Khipu, Mach, etc.)</label>
+                        <input
+                            type="url"
+                            name="banco_link_pago"
+                            value="{{ portal_bancario['banco_link_pago'] if portal_bancario else '' }}"
+                            placeholder="https://... (Si lo llenas, aparecerá el botón '💳 Pagar en Línea Ahora' en el pedido)"
+                            style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #ced4da; font-size: 0.9rem;"
+                        >
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">📝 Resumen / Texto Completo para Copiar en 1 Clic (Se genera solo si lo dejas en blanco)</label>
+                        <textarea
+                            name="datos_transferencia"
+                            rows="4"
+                            style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1.5px solid #ced4da; font-family: inherit; font-size: 0.9rem;"
+                            placeholder="Puedes dejarlo vacío para que se arme automáticamente con los datos de arriba, o escribir aquí tus datos bancarios..."
+                        >{{ datos_transferencia }}</textarea>
+                    </div>
+
                     <div style="display: flex; justify-content: flex-end;">
-                        <button type="submit" class="btn-primary">💾 Guardar Datos Bancarios</button>
+                        <button type="submit" class="btn-primary">💾 Guardar Portal de Pago y Datos Bancarios</button>
                     </div>
                 </form>
             </div>
