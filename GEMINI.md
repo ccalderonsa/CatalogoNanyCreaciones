@@ -5,6 +5,9 @@
 - **Logo oficial:** `nanycreaciones.jpeg` (servido en `/logo.jpeg`).
 - **Paleta de colores:** Mantener siempre los colores originales (`--primary: #ff6b4a`, `--primary-hover: #e85635`, `--secondary: #2ec4b6`, `--bg: #fffdf9`, `--text: #2b2d42`, `--border: #f0e6dd`, `#25d366`).
 - **Diseño responsivo:** Todas las vistas (`/`, `/admin`, `/login`, `/pedido/<codigo>`) deben verse limpias y adaptadas tanto en navegador de laptop como en celular.
+- **Portal de Pago y Transferencia en Línea (`/pedido/<codigo>`):**
+  - Link oficial de cobro sin comisión (Slach / Fintoc): `https://fintoc.me/nanycreaciones` (concatena automáticamente `/{monto}` en cada pedido).
+  - Tarjeta bancaria interactiva con copiado campo por campo y subida de comprobante de transferencia directamente en la web (`/pedido/<codigo>/comprobante`).
 
 ## 2. Dependencias y Entorno Local
 - **Regla de dependencias:** Siempre que se agregue una nueva librería de Python al proyecto, se debe actualizar `requirements.txt` inmediatamente.
