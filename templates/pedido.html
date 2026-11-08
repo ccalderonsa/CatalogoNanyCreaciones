@@ -34,6 +34,16 @@
     </nav>
 
     <main class="container" style="padding-top: 2rem;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alerts" style="margin-bottom: 1.25rem;">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
         <!-- Cabecera y Seguimiento en Vivo del Pedido -->
         <div class="receipt-card">
             <div class="receipt-top-row">
@@ -178,25 +188,153 @@
                 </div>
 
                 <div class="receipt-box receipt-payment-box">
-                    <h3>🏦 Datos para Transferencia y Coordinación</h3>
-                    {% if datos_transferencia %}
-                        <p class="receipt-payment-hint">Puedes transferir el total de <strong>${{ "{:,.0f}".format(pedido['total']).replace(",", ".") }}</strong> a la siguiente cuenta y enviar tu comprobante por WhatsApp:</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.55rem;">
+                        <h3 style="margin-bottom: 0;">🏦 Portal de Pago y Transferencia</h3>
+                        {% if pedido['estado'] in ['Pagado', 'Enviado', 'Entregado'] %}
+                            <span class="status-badge status-pagado" style="font-size: 0.78rem;">✓ Pago Confirmado</span>
+                        {% elif 'comprobante_pago' in pedido.keys() and pedido['comprobante_pago'] %}
+                            <span class="status-badge status-pendiente" style="font-size: 0.78rem;">⏳ Comprobante en Revisión</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Monto exacto con botón de copiado directo -->
+                    <div style="background: #fff; border: 1.5px solid var(--border); border-radius: 12px; padding: 0.65rem 0.85rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <div>
+                            <span style="font-size: 0.78rem; color: var(--text-muted); display: block; font-weight: 700; text-transform: uppercase;">Monto Exacto a Transferir</span>
+                            <strong style="font-size: 1.2rem; color: var(--primary-hover);">${{ "{:,.0f}".format(pedido['total']).replace(",", ".") }}</strong>
+                        </div>
+                        <button
+                            type="button"
+                            class="btn-secondary btn-sm"
+                            onclick="copiarTextoIndividual('{{ pedido['total'] | round | int }}', this)"
+                            style="padding: 0.38rem 0.75rem; font-size: 0.8rem;"
+                        >
+                            📋 Copiar Monto
+                        </button>
+                    </div>
+
+                    {% set tiene_campos_banco = portal_bancario and (portal_bancario['banco_nombre'] or portal_bancario['banco_numero_cuenta'] or portal_bancario['banco_rut'] or portal_bancario['banco_titular'] or portal_bancario['banco_correo']) %}
+
+                    {% if portal_bancario and portal_bancario['banco_link_pago'] %}
+                        <a
+                            href="{{ portal_bancario['banco_link_pago'] }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="btn-primary"
+                            style="text-decoration: none; width: 100%; display: inline-flex; justify-content: center; align-items: center; gap: 0.45rem; margin-bottom: 0.8rem; padding: 0.75rem 1rem; font-size: 0.95rem;"
+                        >
+                            💳 Pagar en Línea Ahora (Link de Pago) →
+                        </a>
+                    {% endif %}
+
+                    {% if tiene_campos_banco %}
+                        <p class="receipt-payment-hint" style="margin-bottom: 0.5rem;">
+                            Toca <strong>Copiar</strong> en cada dato para pegarlo directamente en la app de tu banco:
+                        </p>
+                        <div style="display: flex; flex-direction: column; gap: 0.42rem; margin-bottom: 0.75rem;">
+                            {% if portal_bancario['banco_titular'] %}
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 0.45rem 0.75rem; border-radius: 10px; border: 1px solid #f0e6dd; font-size: 0.88rem;">
+                                    <span><strong style="color: var(--text-muted);">Nombre:</strong> {{ portal_bancario['banco_titular'] }}</span>
+                                    <button type="button" class="btn-secondary btn-sm" style="padding: 0.22rem 0.55rem; font-size: 0.76rem;" onclick="copiarTextoIndividual({{ portal_bancario['banco_titular'] | tojson | forceescape }}, this)">📋 Copiar</button>
+                                </div>
+                            {% endif %}
+                            {% if portal_bancario['banco_rut'] %}
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 0.45rem 0.75rem; border-radius: 10px; border: 1px solid #f0e6dd; font-size: 0.88rem;">
+                                    <span><strong style="color: var(--text-muted);">RUT:</strong> {{ portal_bancario['banco_rut'] }}</span>
+                                    <button type="button" class="btn-secondary btn-sm" style="padding: 0.22rem 0.55rem; font-size: 0.76rem;" onclick="copiarTextoIndividual({{ portal_bancario['banco_rut'] | tojson | forceescape }}, this)">📋 Copiar</button>
+                                </div>
+                            {% endif %}
+                            {% if portal_bancario['banco_nombre'] %}
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 0.45rem 0.75rem; border-radius: 10px; border: 1px solid #f0e6dd; font-size: 0.88rem;">
+                                    <span><strong style="color: var(--text-muted);">Banco:</strong> {{ portal_bancario['banco_nombre'] }}{{ ' (' ~ portal_bancario['banco_tipo_cuenta'] ~ ')' if portal_bancario['banco_tipo_cuenta'] else '' }}</span>
+                                    <button type="button" class="btn-secondary btn-sm" style="padding: 0.22rem 0.55rem; font-size: 0.76rem;" onclick="copiarTextoIndividual({{ portal_bancario['banco_nombre'] | tojson | forceescape }}, this)">📋 Copiar</button>
+                                </div>
+                            {% endif %}
+                            {% if portal_bancario['banco_numero_cuenta'] %}
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 0.45rem 0.75rem; border-radius: 10px; border: 1px solid #f0e6dd; font-size: 0.88rem;">
+                                    <span><strong style="color: var(--text-muted);">N° Cuenta:</strong> {{ portal_bancario['banco_numero_cuenta'] }}</span>
+                                    <button type="button" class="btn-secondary btn-sm" style="padding: 0.22rem 0.55rem; font-size: 0.76rem;" onclick="copiarTextoIndividual({{ portal_bancario['banco_numero_cuenta'] | tojson | forceescape }}, this)">📋 Copiar</button>
+                                </div>
+                            {% endif %}
+                            {% if portal_bancario['banco_correo'] %}
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 0.45rem 0.75rem; border-radius: 10px; border: 1px solid #f0e6dd; font-size: 0.88rem;">
+                                    <span><strong style="color: var(--text-muted);">Correo:</strong> {{ portal_bancario['banco_correo'] }}</span>
+                                    <button type="button" class="btn-secondary btn-sm" style="padding: 0.22rem 0.55rem; font-size: 0.76rem;" onclick="copiarTextoIndividual({{ portal_bancario['banco_correo'] | tojson | forceescape }}, this)">📋 Copiar</button>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <pre id="texto-transferencia" style="display: none;">{{ datos_transferencia }}</pre>
+                        <button type="button" class="btn-secondary btn-sm" id="btn-copiar-banco" onclick="copiarDatosBancarios()" style="width: 100%; margin-bottom: 0.85rem;">
+                            📋 Copiar Todos los Datos Bancarios
+                        </button>
+                    {% elif datos_transferencia %}
+                        <p class="receipt-payment-hint">Puedes transferir el total de <strong>${{ "{:,.0f}".format(pedido['total']).replace(",", ".") }}</strong> a la siguiente cuenta:</p>
                         <pre id="texto-transferencia" class="bank-details-pre">{{ datos_transferencia }}</pre>
-                        <button type="button" class="btn-secondary btn-sm" id="btn-copiar-banco" onclick="copiarDatosBancarios()" style="width: 100%; margin-bottom: 0.65rem;">
+                        <button type="button" class="btn-secondary btn-sm" id="btn-copiar-banco" onclick="copiarDatosBancarios()" style="width: 100%; margin-bottom: 0.85rem;">
                             📋 Copiar Datos de Transferencia
                         </button>
                     {% else %}
                         <p class="receipt-payment-hint">Coordina los datos de transferencia o entrega directamente con Nany Creaciones por WhatsApp.</p>
                     {% endif %}
 
-                    {% set msg_wa = "Hola Nany Creaciones! 👋 Te escribo por mi Pedido #" ~ pedido['codigo'] ~ " (Total: $" ~ "{:,.0f}".format(pedido['total']).replace(",", ".") ~ "). " ~ (base_publica ~ "/pedido/" ~ pedido['codigo']) %}
+                    <!-- Subida de Comprobante de Pago Directamente en la Web -->
+                    <div style="background: #fff; border: 1.5px dashed #cbd5e1; border-radius: 14px; padding: 0.85rem; margin-bottom: 0.85rem;">
+                        <h4 style="font-size: 0.92rem; margin-bottom: 0.35rem; color: var(--text);">
+                            🧾 Adjuntar Comprobante de Transferencia aquí
+                        </h4>
+
+                        {% if 'comprobante_pago' in pedido.keys() and pedido['comprobante_pago'] %}
+                            <div style="display: flex; align-items: center; gap: 0.75rem; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.6rem 0.75rem; border-radius: 10px; margin-bottom: 0.65rem;">
+                                <a href="{{ url_for('static', filename='uploads/' ~ pedido['comprobante_pago']) }}" target="_blank" title="Ver comprobante completo">
+                                    <img
+                                        src="{{ url_for('static', filename='uploads/' ~ pedido['comprobante_pago']) }}"
+                                        alt="Comprobante de pago"
+                                        style="width: 54px; height: 54px; object-fit: cover; border-radius: 8px; border: 1px solid #86efac;"
+                                    >
+                                </a>
+                                <div style="font-size: 0.83rem; line-height: 1.35;">
+                                    <strong style="color: #166534; display: block;">✓ Comprobante adjuntado en el pedido</strong>
+                                    {% if 'comprobante_fecha' in pedido.keys() and pedido['comprobante_fecha'] %}
+                                        <span style="color: #15803d;">Subido el {{ pedido['comprobante_fecha'] }}</span>
+                                    {% endif %}
+                                    <div>
+                                        <a href="{{ url_for('static', filename='uploads/' ~ pedido['comprobante_pago']) }}" target="_blank" style="color: var(--primary-hover); font-weight: 700; text-decoration: underline;">
+                                            🔍 Ver imagen completa
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.55rem;">
+                                Una vez realizada la transferencia, sube aquí la captura o foto de tu comprobante para que validemos tu pago:
+                            </p>
+                        {% endif %}
+
+                        {% if pedido['estado'] != 'Anulado' %}
+                            <form action="{{ url_for('subir_comprobante_pedido', codigo=pedido['codigo']) }}" method="POST" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <input
+                                    type="file"
+                                    name="comprobante"
+                                    accept="image/*"
+                                    required
+                                    style="font-size: 0.82rem; padding: 0.35rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; width: 100%;"
+                                >
+                                <button type="submit" class="btn-primary btn-sm" style="width: 100%; justify-content: center;">
+                                    📤 {{ 'Reemplazar Comprobante de Pago' if ('comprobante_pago' in pedido.keys() and pedido['comprobante_pago']) else 'Subir Comprobante de Pago' }}
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+
+                    {% set aviso_comp = "Ya subí el comprobante de pago en la web. " if ('comprobante_pago' in pedido.keys() and pedido['comprobante_pago']) else "" %}
+                    {% set msg_wa = "Hola Nany Creaciones! 👋 Te escribo por mi Pedido #" ~ pedido['codigo'] ~ " (Total: $" ~ "{:,.0f}".format(pedido['total']).replace(",", ".") ~ "). " ~ aviso_comp ~ (base_publica ~ "/pedido/" ~ pedido['codigo']) %}
                     <a
                         href="https://wa.me/{{ whatsapp }}?text={{ msg_wa | urlencode }}"
                         target="_blank"
                         class="btn-whatsapp"
                         style="text-decoration: none; width: 100%; display: inline-flex; justify-content: center;"
                     >
-                        📲 Enviar Comprobante / Consultar por WhatsApp
+                        📲 Avisar / Consultar por WhatsApp
                     </a>
                 </div>
             </div>
@@ -229,6 +367,15 @@
     </main>
 
     <script>
+        function copiarTextoIndividual(texto, btn) {
+            if (!texto) return;
+            navigator.clipboard.writeText(String(texto)).then(() => {
+                const original = btn.textContent;
+                btn.textContent = '✓ ¡Copiado!';
+                setTimeout(() => { btn.textContent = original; }, 2000);
+            });
+        }
+
         function copiarDatosBancarios() {
             const el = document.getElementById('texto-transferencia');
             const btn = document.getElementById('btn-copiar-banco');
