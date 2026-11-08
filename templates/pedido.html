@@ -224,10 +224,14 @@
                             target="_blank"
                             rel="noopener noreferrer"
                             class="btn-primary"
-                            style="text-decoration: none; width: 100%; display: inline-flex; justify-content: center; align-items: center; gap: 0.45rem; margin-bottom: 0.8rem; padding: 0.78rem 1rem; font-size: 0.95rem;"
+                            style="text-decoration: none; width: 100%; display: inline-flex; justify-content: center; align-items: center; gap: 0.45rem; margin-bottom: 0.4rem; padding: 0.78rem 1rem; font-size: 0.95rem;"
                         >
                             🏦 Transferir ${{ "{:,.0f}".format(pedido['total']).replace(",", ".") }} en Línea (Sin Comisión) →
                         </a>
+                        <p style="font-size: 0.79rem; color: var(--text-muted); line-height: 1.38; margin-bottom: 0.8rem; background: #fffdf9; border: 1px solid var(--border); padding: 0.5rem 0.65rem; border-radius: 9px;">
+                            👆 <strong>Pago directo en línea</strong> desde <em>BancoEstado (CuentaRUT), Santander, Banco de Chile, BCI, Falabella, Itaú y Scotiabank</em>.<br>
+                            💡 Si transfieres desde <strong>Mercado Pago, Tenpo, Mach u otra app</strong>, copia los datos de abajo:
+                        </p>
                     {% endif %}
 
                     {% if tiene_campos_banco %}
