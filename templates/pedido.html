@@ -215,6 +215,16 @@
 
                     {% set tiene_campos_banco = portal_bancario and (portal_bancario['banco_nombre'] or portal_bancario['banco_numero_cuenta'] or portal_bancario['banco_rut'] or portal_bancario['banco_titular'] or portal_bancario['banco_correo']) %}
 
+                    {% if portal_bancario and portal_bancario.get('mp_access_token') and pedido['estado'] == 'Pendiente' %}
+                        <a
+                            href="{{ url_for('pagar_con_mercadopago', codigo=pedido['codigo']) }}"
+                            class="btn-primary"
+                            style="background: #009ee3; text-decoration: none; width: 100%; display: inline-flex; justify-content: center; align-items: center; gap: 0.45rem; margin-bottom: 0.7rem; padding: 0.8rem 1rem; font-size: 0.95rem; box-shadow: 0 6px 16px rgba(0, 158, 227, 0.28);"
+                        >
+                            💙 Pagar ${{ "{:,.0f}".format(pedido['total']).replace(",", ".") }} en Línea con Mercado Pago →
+                        </a>
+                    {% endif %}
+
                     {% if portal_bancario and portal_bancario['banco_link_pago'] %}
                         <a
                             href="{{ portal_bancario['banco_link_pago'] }}"
@@ -223,7 +233,7 @@
                             class="btn-primary"
                             style="text-decoration: none; width: 100%; display: inline-flex; justify-content: center; align-items: center; gap: 0.45rem; margin-bottom: 0.8rem; padding: 0.75rem 1rem; font-size: 0.95rem;"
                         >
-                            💳 Pagar en Línea Ahora (Link de Pago) →
+                            💳 Pagar en Línea Ahora (Link Directo) →
                         </a>
                     {% endif %}
 
