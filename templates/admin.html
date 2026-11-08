@@ -654,30 +654,19 @@
                         </div>
                     </div>
 
-                    <div style="background: #f0f9ff; border: 1.5px solid #bae6fd; border-radius: 12px; padding: 0.85rem;">
-                        <label style="font-size: 0.85rem; font-weight: 800; color: #0369a1; display: block; margin-bottom: 0.25rem;">
-                            💙 Mercado Pago Automático — Access Token de Producción (Genera el link con el monto exacto de cada pedido)
+                    <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 0.85rem;">
+                        <label style="font-size: 0.85rem; font-weight: 800; color: #166534; display: block; margin-bottom: 0.25rem;">
+                            🔗 Link de Transferencia Rápida en Línea (Slach.cl — 0% Comisión)
                         </label>
-                        <p style="font-size: 0.8rem; color: #0c4a6e; margin-bottom: 0.5rem;">
-                            Pega aquí tu <strong>Access Token</strong> (empieza con <code>APP_USR-...</code>). Lo obtienes gratis en <a href="https://www.mercadopago.cl/developers/panel/app" target="_blank" style="color: #0284c7; font-weight: 700;">Mercado Pago Developers → Tus integraciones</a>.
+                        <p style="font-size: 0.8rem; color: #14532d; margin-bottom: 0.5rem;">
+                            En <a href="https://slach.cl" target="_blank" style="color: #15803d; font-weight: 700;">https://slach.cl</a> puedes crear gratis tu link conectado a tu cuenta de <strong>Mercado Pago</strong>. Si lo pegas aquí (ej: <code>https://slach.cl/nanycreaciones</code>), el sistema le pondrá el monto exacto de cada pedido automáticamente y <strong>sin el 3,8% de comisión</strong>.
                         </p>
-                        <input
-                            type="password"
-                            name="mp_access_token"
-                            value="{{ portal_bancario['mp_access_token'] if portal_bancario else '' }}"
-                            placeholder="APP_USR-0000000000000000-000000-..."
-                            style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #7dd3fc; font-size: 0.9rem; background: #fff;"
-                        >
-                    </div>
-
-                    <div>
-                        <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">🔗 O Link de Cobro Fijo (Opcional — Link de tu App Mercado Pago, Slach, Mach, etc.)</label>
                         <input
                             type="url"
                             name="banco_link_pago"
                             value="{{ portal_bancario['banco_link_pago'] if portal_bancario else '' }}"
-                            placeholder="https://link.mercadopago.cl/... (Opcional)"
-                            style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #ced4da; font-size: 0.9rem;"
+                            placeholder="https://slach.cl/tu-usuario (Opcional)"
+                            style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #86efac; font-size: 0.9rem; background: #fff;"
                         >
                     </div>
 
