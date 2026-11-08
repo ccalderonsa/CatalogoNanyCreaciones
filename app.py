@@ -218,6 +218,8 @@ def init_db():
             ("costo_envio", "REAL NOT NULL DEFAULT 0"),
             ("empresa_envio", "TEXT NOT NULL DEFAULT ''"),
             ("codigo_seguimiento", "TEXT NOT NULL DEFAULT ''"),
+            ("comprobante_pago", "TEXT NOT NULL DEFAULT ''"),
+            ("comprobante_fecha", "TEXT NOT NULL DEFAULT ''"),
             ("subtotal", "REAL NOT NULL DEFAULT 0"),
             ("descuento_monto", "REAL NOT NULL DEFAULT 0"),
             ("cupon_usado", "TEXT NOT NULL DEFAULT ''"),
@@ -277,6 +279,28 @@ def get_admin_pin() -> str:
 
 def get_datos_transferencia() -> str:
     return get_config_value("datos_transferencia", "")
+
+
+def get_portal_bancario() -> dict[str, str]:
+    claves = [
+        "banco_nombre",
+        "banco_tipo_cuenta",
+        "banco_numero_cuenta",
+        "banco_rut",
+        "banco_titular",
+        "banco_correo",
+        "banco_link_pago",
+        "datos_transferencia",
+    ]
+    resultado = {k: "" for k in claves}
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            "SELECT clave, valor FROM configuracion WHERE clave IN (?, ?, ?, ?, ?, ?, ?, ?)",
+            tuple(claves),
+        ).fetchall()
+        for r in rows:
+            resultado[r["clave"]] = r["valor"] or ""
+    return resultado
 
 
 def admin_required(f):
@@ -585,6 +609,7 @@ def admin():
     productos = get_productos("", solo_visibles=False)
     whatsapp = get_whatsapp_number()
     datos_transferencia = get_datos_transferencia()
+    portal_bancario = get_portal_bancario()
     base_publica = get_public_base_url()
 
     with get_db_connection() as conn:
@@ -639,6 +664,7 @@ def admin():
         cupones=cupones_actuales,
         whatsapp=whatsapp,
         datos_transferencia=datos_transferencia,
+        portal_bancario=portal_bancario,
         tab_activa=tab_activa,
     )
 
@@ -690,18 +716,56 @@ def eliminar_cupon():
 @app.route("/admin/transferencia", methods=["POST"])
 @admin_required
 def guardar_datos_transferencia():
-    datos = request.form.get("datos_transferencia", "").strip()
-    with get_db_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO configuracion (clave, valor)
-            VALUES ('datos_transferencia', ?)
-            ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor
-            """,
-            (datos,),
+    campos = {
+        "banco_nombre": request.form.get("banco_nombre", "").strip(),
+        "banco_tipo_cuenta": request.form.get("banco_tipo_cuenta", "").strip(),
+        "banco_numero_cuenta": request.form.get("banco_numero_cuenta", "").strip(),
+        "banco_rut": request.form.get("banco_rut", "").strip(),
+        "banco_titular": request.form.get("banco_titular", "").strip(),
+        "banco_correo": request.form.get("banco_correo", "").strip(),
+        "banco_link_pago": request.form.get("banco_link_pago", "").strip(),
+        "datos_transferencia": request.form.get("datos_transferencia", "").strip(),
+    }
+
+    # Si no escribió un bloque libre pero sí llenó los campos del banco, armamos el resumen automáticamente
+    if not campos["datos_transferencia"] and any(
+        campos[k]
+        for k in (
+            "banco_nombre",
+            "banco_tipo_cuenta",
+            "banco_numero_cuenta",
+            "banco_rut",
+            "banco_titular",
+            "banco_correo",
         )
+    ):
+        lineas = []
+        if campos["banco_titular"]:
+            lineas.append(f"Nombre: {campos['banco_titular']}")
+        if campos["banco_rut"]:
+            lineas.append(f"RUT: {campos['banco_rut']}")
+        if campos["banco_nombre"]:
+            lineas.append(f"Banco: {campos['banco_nombre']}")
+        if campos["banco_tipo_cuenta"]:
+            lineas.append(f"Tipo de Cuenta: {campos['banco_tipo_cuenta']}")
+        if campos["banco_numero_cuenta"]:
+            lineas.append(f"N° de Cuenta: {campos['banco_numero_cuenta']}")
+        if campos["banco_correo"]:
+            lineas.append(f"Correo: {campos['banco_correo']}")
+        campos["datos_transferencia"] = "\n".join(lineas)
+
+    with get_db_connection() as conn:
+        for clave, valor in campos.items():
+            conn.execute(
+                """
+                INSERT INTO configuracion (clave, valor)
+                VALUES (?, ?)
+                ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor
+                """,
+                (clave, valor),
+            )
         conn.commit()
-    flash("Datos bancarios de transferencia guardados correctamente.", "success")
+    flash("Portal de transferencia y datos bancarios actualizados correctamente.", "success")
     return redirect(url_for("admin", tab="configuracion"))
 
 
@@ -1162,6 +1226,16 @@ def cambiar_estado_pedido(codigo: str):
                     except OSError:
                         pass
 
+            # Eliminar comprobante de pago subido si existe
+            comp_pago = pedido["comprobante_pago"] if "comprobante_pago" in pedido.keys() else ""
+            if comp_pago:
+                ruta_comp = os.path.join(app.config["UPLOAD_FOLDER"], comp_pago)
+                if os.path.exists(ruta_comp):
+                    try:
+                        os.remove(ruta_comp)
+                    except OSError:
+                        pass
+
             conn.execute("DELETE FROM pedidos WHERE codigo = ?", (codigo,))
             conn.commit()
             flash(
@@ -1256,6 +1330,7 @@ def ver_pedido(codigo: str):
     base_publica = get_public_base_url()
     whatsapp = get_whatsapp_number()
     datos_transferencia = get_datos_transferencia()
+    portal_bancario = get_portal_bancario()
     emp_envio = pedido["empresa_envio"] if "empresa_envio" in pedido.keys() else ""
     url_courier = URLS_COURIER.get(emp_envio, "")
 
@@ -1266,8 +1341,68 @@ def ver_pedido(codigo: str):
         base_publica=base_publica,
         whatsapp=whatsapp,
         datos_transferencia=datos_transferencia,
+        portal_bancario=portal_bancario,
         url_courier=url_courier,
     )
+
+
+@app.route("/pedido/<codigo>/comprobante", methods=["POST"])
+def subir_comprobante_pedido(codigo: str):
+    """Permite al cliente adjuntar la foto o captura de su comprobante de transferencia bancaria."""
+    archivo = request.files.get("comprobante")
+    if not archivo or archivo.filename == "":
+        flash("Por favor selecciona la imagen o captura de tu comprobante de pago.", "error")
+        return redirect(url_for("ver_pedido", codigo=codigo))
+
+    if not allowed_file(archivo.filename):
+        flash("Formato no permitido. Sube una imagen o captura (JPG, PNG, WEBP o GIF).", "error")
+        return redirect(url_for("ver_pedido", codigo=codigo))
+
+    with get_db_connection() as conn:
+        pedido = conn.execute(
+            "SELECT * FROM pedidos WHERE codigo = ?", (codigo,)
+        ).fetchone()
+        if not pedido:
+            return redirect(url_for("index"))
+
+        # Optimizar la imagen del comprobante para ocupar poco espacio (<150 KB)
+        nombre_comprobante = f"comprobante_{codigo}_{uuid.uuid4().hex[:8]}.jpg"
+        ruta_destino = os.path.join(app.config["UPLOAD_FOLDER"], nombre_comprobante)
+        try:
+            img = Image.open(archivo)
+            img = ImageOps.exif_transpose(img).convert("RGB")
+            img.thumbnail((1100, 1100))
+            img.save(ruta_destino, "JPEG", quality=82, optimize=True)
+        except Exception:
+            ext = secure_filename(archivo.filename).rsplit(".", 1)[1].lower()
+            nombre_comprobante = f"comprobante_{codigo}_{uuid.uuid4().hex[:8]}.{ext}"
+            ruta_destino = os.path.join(app.config["UPLOAD_FOLDER"], nombre_comprobante)
+            archivo.seek(0)
+            archivo.save(ruta_destino)
+
+        # Eliminar comprobante anterior si está reemplazándolo
+        anterior = pedido["comprobante_pago"] if "comprobante_pago" in pedido.keys() else ""
+        if anterior:
+            ruta_ant = os.path.join(app.config["UPLOAD_FOLDER"], anterior)
+            if os.path.exists(ruta_ant):
+                try:
+                    os.remove(ruta_ant)
+                except OSError:
+                    pass
+
+        fecha_str = time.strftime("%Y-%m-%d %H:%M")
+        conn.execute(
+            """
+            UPDATE pedidos
+            SET comprobante_pago = ?, comprobante_fecha = ?
+            WHERE codigo = ?
+            """,
+            (nombre_comprobante, fecha_str, codigo),
+        )
+        conn.commit()
+
+    flash("✅ ¡Comprobante recibido con éxito! Nany Creaciones verificará tu transferencia y actualizará el estado de tu pedido.", "success")
+    return redirect(url_for("ver_pedido", codigo=codigo))
 
 
 @app.route("/api/comprar", methods=["POST"])
