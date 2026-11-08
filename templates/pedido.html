@@ -217,7 +217,8 @@
 
                     {% if portal_bancario and portal_bancario['banco_link_pago'] %}
                         {% set raw_link = portal_bancario['banco_link_pago'].rstrip('/') %}
-                        {% set link_final = (raw_link ~ '/' ~ (pedido['total'] | round | int)) if ('slach.cl/' in raw_link and raw_link.split('slach.cl/')[1].count('/') == 0) else portal_bancario['banco_link_pago'] %}
+                        {% set es_slach_o_fintoc = ('slach.cl/' in raw_link or 'fintoc.me/' in raw_link) %}
+                        {% set link_final = (raw_link ~ '/' ~ (pedido['total'] | round | int)) if es_slach_o_fintoc else portal_bancario['banco_link_pago'] %}
                         <a
                             href="{{ link_final }}"
                             target="_blank"
