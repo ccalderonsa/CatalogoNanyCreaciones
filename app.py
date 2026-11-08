@@ -357,6 +357,43 @@ def get_portal_bancario() -> dict[str, str]:
     return resultado
 
 
+DEFAULT_GUIA_INFO = {
+    "guia_talla_1_titulo": "👶 Talla 2 a 5 años (Preescolar / Jardín)",
+    "guia_talla_1_desc": "Medidas aprox.: 48 a 52 cm de largo × 40 cm de ancho. Con tiras regulables en cuello y cintura para adaptarse a su crecimiento.",
+    "guia_talla_2_titulo": "🧒 Talla 6 a 10 años (Escolar)",
+    "guia_talla_2_desc": "Medidas aprox.: 58 a 62 cm de largo × 46 cm de ancho. Calce cómodo para talleres de cocina, arte o actividades escolares, con bolsillo frontal.",
+    "guia_talla_3_titulo": "🎒 Morrales, Loncheras y Accesorios",
+    "guia_talla_3_desc": "Confeccionados con telas resistentes y fáciles de limpiar, ideales para llevar colación, botella, muda de ropa o útiles.",
+    "guia_cuidados": (
+        "Lavar con agua fría o tibia (a mano o en ciclo delicado).\n"
+        "No usar cloro ni blanqueadores para proteger los estampados y colores.\n"
+        "Secar a la sombra; evitar secadora de alta temperatura.\n"
+        "Si tu producto tiene nombre personalizado, planchar siempre por el revés de la tela a temperatura baja/media."
+    ),
+    "guia_faq_1_preg": "✨ ¿Cómo funciona el estampado de nombre personalizado (+$1.500)?",
+    "guia_faq_1_resp": "Al revisar tu pedido en el carrito, marca la opción «Agregar Nombre Estampado (+$1.500)» y escribe el nombre del niño o niña. Personalizamos tu producto con acabado duradero y prolijo.",
+    "guia_faq_2_preg": "🏦 ¿Cómo se realiza el pago y la confirmación?",
+    "guia_faq_2_resp": "Al confirmar tu pedido recibirás un enlace a tu Comprobante Digital donde podrás transferir en línea sin comisión o copiar nuestros datos bancarios en 1 clic y adjuntar la captura de tu comprobante ahí mismo.",
+    "guia_faq_3_preg": "🚚 ¿Cómo funcionan las entregas y envíos a domicilio?",
+    "guia_faq_3_resp": "Puedes elegir Retiro / Punto de encuentro (sin costo extra, coordinado por WhatsApp) o Envío a domicilio (+$3.000). Cuando tu pedido sea despachado, podrás ver tu número de seguimiento en vivo desde el botón 📦 Seguimiento.",
+}
+
+
+def get_guia_info() -> dict[str, str]:
+    resultado = dict(DEFAULT_GUIA_INFO)
+    claves = list(DEFAULT_GUIA_INFO.keys())
+    placeholders = ",".join("?" for _ in claves)
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            f"SELECT clave, valor FROM configuracion WHERE clave IN ({placeholders})",
+            tuple(claves),
+        ).fetchall()
+        for r in rows:
+            if (r["valor"] or "").strip():
+                resultado[r["clave"]] = r["valor"].strip()
+    return resultado
+
+
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -526,6 +563,7 @@ def index():
     todos_productos = [dict(row) for row in todos_rows]
     whatsapp = get_whatsapp_number()
     datos_transferencia = get_datos_transferencia()
+    guia_info = get_guia_info()
 
     return render_template(
         "index.html",
@@ -535,6 +573,7 @@ def index():
         edades=categorias_actuales,
         whatsapp=whatsapp,
         datos_transferencia=datos_transferencia,
+        guia_info=guia_info,
     )
 
 
@@ -664,6 +703,7 @@ def admin():
     whatsapp = get_whatsapp_number()
     datos_transferencia = get_datos_transferencia()
     portal_bancario = get_portal_bancario()
+    guia_info = get_guia_info()
     base_publica = get_public_base_url()
 
     with get_db_connection() as conn:
@@ -719,6 +759,7 @@ def admin():
         whatsapp=whatsapp,
         datos_transferencia=datos_transferencia,
         portal_bancario=portal_bancario,
+        guia_info=guia_info,
         tab_activa=tab_activa,
     )
 
@@ -820,6 +861,25 @@ def guardar_datos_transferencia():
             )
         conn.commit()
     flash("Portal de transferencia y datos bancarios actualizados correctamente.", "success")
+    return redirect(url_for("admin", tab="configuracion"))
+
+
+@app.route("/admin/guia", methods=["POST"])
+@admin_required
+def guardar_guia_info():
+    with get_db_connection() as conn:
+        for clave, valor_defecto in DEFAULT_GUIA_INFO.items():
+            valor = request.form.get(clave, "").strip() or valor_defecto
+            conn.execute(
+                """
+                INSERT INTO configuracion (clave, valor)
+                VALUES (?, ?)
+                ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor
+                """,
+                (clave, valor),
+            )
+        conn.commit()
+    flash("Guía de Tallas, Cuidados y Preguntas Frecuentes actualizada correctamente.", "success")
     return redirect(url_for("admin", tab="configuracion"))
 
 
