@@ -686,6 +686,65 @@
                 </form>
             </div>
 
+            <!-- Editor de Guía de Tallas, Cuidados y Preguntas Frecuentes -->
+            <div class="whatsapp-config-card" style="flex-direction: column; align-items: stretch;">
+                <div>
+                    <h3>📏 Editar Guía de Tallas, Cuidados y Preguntas Frecuentes</h3>
+                    <p>Modifica aquí libremente las medidas referenciales, recomendaciones de lavado y preguntas frecuentes que ven tus clientes en el catálogo.</p>
+                </div>
+                <form action="{{ url_for('guardar_guia_info') }}" method="POST" style="display: flex; flex-direction: column; gap: 0.85rem; width: 100%; margin-top: 0.5rem;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem;">
+                        <div style="background: #fffdf9; border: 1px solid var(--border); padding: 0.75rem; border-radius: 12px;">
+                            <label style="font-size: 0.8rem; font-weight: 800; display: block; margin-bottom: 0.25rem;">📐 Talla / Categoría 1 (Título)</label>
+                            <input type="text" name="guia_talla_1_titulo" value="{{ guia_info['guia_talla_1_titulo'] if guia_info else '' }}" style="width: 100%; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid #ced4da; font-size: 0.88rem; margin-bottom: 0.45rem;">
+                            <label style="font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 0.2rem;">Medidas y detalle:</label>
+                            <textarea name="guia_talla_1_desc" rows="3" style="width: 100%; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid #ced4da; font-family: inherit; font-size: 0.86rem;">{{ guia_info['guia_talla_1_desc'] if guia_info else '' }}</textarea>
+                        </div>
+
+                        <div style="background: #fffdf9; border: 1px solid var(--border); padding: 0.75rem; border-radius: 12px;">
+                            <label style="font-size: 0.8rem; font-weight: 800; display: block; margin-bottom: 0.25rem;">📐 Talla / Categoría 2 (Título)</label>
+                            <input type="text" name="guia_talla_2_titulo" value="{{ guia_info['guia_talla_2_titulo'] if guia_info else '' }}" style="width: 100%; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid #ced4da; font-size: 0.88rem; margin-bottom: 0.45rem;">
+                            <label style="font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 0.2rem;">Medidas y detalle:</label>
+                            <textarea name="guia_talla_2_desc" rows="3" style="width: 100%; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid #ced4da; font-family: inherit; font-size: 0.86rem;">{{ guia_info['guia_talla_2_desc'] if guia_info else '' }}</textarea>
+                        </div>
+
+                        <div style="background: #fffdf9; border: 1px solid var(--border); padding: 0.75rem; border-radius: 12px;">
+                            <label style="font-size: 0.8rem; font-weight: 800; display: block; margin-bottom: 0.25rem;">📐 Talla / Categoría 3 (Título)</label>
+                            <input type="text" name="guia_talla_3_titulo" value="{{ guia_info['guia_talla_3_titulo'] if guia_info else '' }}" style="width: 100%; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid #ced4da; font-size: 0.88rem; margin-bottom: 0.45rem;">
+                            <label style="font-size: 0.78rem; font-weight: 700; display: block; margin-bottom: 0.2rem;">Medidas y detalle:</label>
+                            <textarea name="guia_talla_3_desc" rows="3" style="width: 100%; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid #ced4da; font-family: inherit; font-size: 0.86rem;">{{ guia_info['guia_talla_3_desc'] if guia_info else '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.82rem; font-weight: 800; display: block; margin-bottom: 0.25rem;">🧼 Recomendaciones de Lavado y Cuidado (1 consejo por línea)</label>
+                        <textarea name="guia_cuidados" rows="4" style="width: 100%; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1.5px solid #ced4da; font-family: inherit; font-size: 0.88rem;">{{ guia_info['guia_cuidados'] if guia_info else '' }}</textarea>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem;">
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.75rem; border-radius: 12px;">
+                            <label style="font-size: 0.8rem; font-weight: 800; display: block; margin-bottom: 0.25rem;">❓ Pregunta Frecuente 1</label>
+                            <input type="text" name="guia_faq_1_preg" value="{{ guia_info['guia_faq_1_preg'] if guia_info else '' }}" style="width: 100%; padding: 0.48rem 0.65rem; border-radius: 8px; border: 1px solid #ced4da; font-size: 0.86rem; margin-bottom: 0.4rem;">
+                            <textarea name="guia_faq_1_resp" rows="3" style="width: 100%; padding: 0.48rem 0.65rem; border-radius: 8px; border: 1px solid #ced4da; font-family: inherit; font-size: 0.85rem;">{{ guia_info['guia_faq_1_resp'] if guia_info else '' }}</textarea>
+                        </div>
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.75rem; border-radius: 12px;">
+                            <label style="font-size: 0.8rem; font-weight: 800; display: block; margin-bottom: 0.25rem;">❓ Pregunta Frecuente 2</label>
+                            <input type="text" name="guia_faq_2_preg" value="{{ guia_info['guia_faq_2_preg'] if guia_info else '' }}" style="width: 100%; padding: 0.48rem 0.65rem; border-radius: 8px; border: 1px solid #ced4da; font-size: 0.86rem; margin-bottom: 0.4rem;">
+                            <textarea name="guia_faq_2_resp" rows="3" style="width: 100%; padding: 0.48rem 0.65rem; border-radius: 8px; border: 1px solid #ced4da; font-family: inherit; font-size: 0.85rem;">{{ guia_info['guia_faq_2_resp'] if guia_info else '' }}</textarea>
+                        </div>
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 0.75rem; border-radius: 12px;">
+                            <label style="font-size: 0.8rem; font-weight: 800; display: block; margin-bottom: 0.25rem;">❓ Pregunta Frecuente 3</label>
+                            <input type="text" name="guia_faq_3_preg" value="{{ guia_info['guia_faq_3_preg'] if guia_info else '' }}" style="width: 100%; padding: 0.48rem 0.65rem; border-radius: 8px; border: 1px solid #ced4da; font-size: 0.86rem; margin-bottom: 0.4rem;">
+                            <textarea name="guia_faq_3_resp" rows="3" style="width: 100%; padding: 0.48rem 0.65rem; border-radius: 8px; border: 1px solid #ced4da; font-family: inherit; font-size: 0.85rem;">{{ guia_info['guia_faq_3_resp'] if guia_info else '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button type="submit" class="btn-primary">💾 Guardar Cambios en Tallas y Preguntas Frecuentes</button>
+                    </div>
+                </form>
+            </div>
+
             <div class="whatsapp-config-card">
                 <div>
                     <h3>📱 Número de WhatsApp para recibir pedidos</h3>
