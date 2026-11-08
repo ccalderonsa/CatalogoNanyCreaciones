@@ -242,6 +242,8 @@ def init_db():
 
         # Eliminar pedidos que hayan quedado en estado 'Anulado'
         conn.execute("DELETE FROM pedidos WHERE estado = 'Anulado'")
+        # Limpiar token de Mercado Pago para desactivar cobro con comisión
+        conn.execute("DELETE FROM configuracion WHERE clave = 'mp_access_token'")
         conn.commit()
 
 
@@ -290,13 +292,12 @@ def get_portal_bancario() -> dict[str, str]:
         "banco_titular",
         "banco_correo",
         "banco_link_pago",
-        "mp_access_token",
         "datos_transferencia",
     ]
     resultado = {k: "" for k in claves}
     with get_db_connection() as conn:
         rows = conn.execute(
-            "SELECT clave, valor FROM configuracion WHERE clave IN (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "SELECT clave, valor FROM configuracion WHERE clave IN (?, ?, ?, ?, ?, ?, ?, ?)",
             tuple(claves),
         ).fetchall()
         for r in rows:
@@ -755,7 +756,6 @@ def guardar_datos_transferencia():
         "banco_titular": request.form.get("banco_titular", "").strip(),
         "banco_correo": request.form.get("banco_correo", "").strip(),
         "banco_link_pago": request.form.get("banco_link_pago", "").strip(),
-        "mp_access_token": request.form.get("mp_access_token", "").strip(),
         "datos_transferencia": request.form.get("datos_transferencia", "").strip(),
     }
 
@@ -1435,151 +1435,6 @@ def subir_comprobante_pedido(codigo: str):
 
     flash("✅ ¡Comprobante recibido con éxito! Nany Creaciones verificará tu transferencia y actualizará el estado de tu pedido.", "success")
     return redirect(url_for("ver_pedido", codigo=codigo))
-
-
-@app.route("/pedido/<codigo>/pagar-mp", methods=["GET", "POST"])
-def pagar_con_mercadopago(codigo: str):
-    """Genera un link de cobro automático en Mercado Pago por el monto exacto del pedido y redirige al cliente."""
-    portal = get_portal_bancario()
-    mp_token = (portal.get("mp_access_token") or "").strip()
-    if not mp_token:
-        if portal.get("banco_link_pago"):
-            return redirect(portal["banco_link_pago"])
-        flash("El pago automático con Mercado Pago aún no está activado. Puedes transferir usando los datos en pantalla.", "error")
-        return redirect(url_for("ver_pedido", codigo=codigo))
-
-    with get_db_connection() as conn:
-        pedido = conn.execute(
-            "SELECT * FROM pedidos WHERE codigo = ?", (codigo,)
-        ).fetchone()
-    if not pedido:
-        return redirect(url_for("index"))
-
-    monto_clp = max(1, int(round(float(pedido["total"]))))
-    base_publica = get_public_base_url()
-    url_retorno = f"{base_publica}/pedido/{codigo}/retorno-mp"
-    url_webhook = f"{base_publica}/api/webhook/mercadopago"
-
-    payload = {
-        "items": [
-            {
-                "id": codigo,
-                "title": f"Pedido #{codigo} - Nany Creaciones",
-                "description": pedido["resumen_desc"][:200] if pedido["resumen_desc"] else f"Pedido #{codigo}",
-                "quantity": 1,
-                "currency_id": "CLP",
-                "unit_price": monto_clp,
-            }
-        ],
-        "external_reference": codigo,
-        "back_urls": {
-            "success": url_retorno,
-            "pending": url_retorno,
-            "failure": url_retorno,
-        },
-        "auto_return": "approved",
-        "notification_url": url_webhook,
-        "statement_descriptor": "NANY CREACIONES",
-    }
-
-    req = urllib.request.Request(
-        "https://api.mercadopago.com/checkout/preferences",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {mp_token}",
-            "Content-Type": "application/json",
-            "User-Agent": "NanyCreaciones-Catalogo/1.0",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            datos_mp = json.loads(resp.read().decode("utf-8"))
-            link_checkout = datos_mp.get("init_point") or datos_mp.get("sandbox_init_point")
-            if link_checkout:
-                return redirect(link_checkout)
-    except Exception:
-        pass
-
-    flash("No se pudo conectar con Mercado Pago en este momento. Verifica tu Access Token en el panel de administración o utiliza transferencia directa.", "error")
-    return redirect(url_for("ver_pedido", codigo=codigo))
-
-
-@app.route("/pedido/<codigo>/retorno-mp", methods=["GET"])
-def retorno_mercadopago(codigo: str):
-    """Recibe al cliente de vuelta desde Mercado Pago y confirma el estado del pago automáticamente."""
-    status = (request.args.get("status") or request.args.get("collection_status") or "").lower()
-    payment_id = request.args.get("payment_id") or request.args.get("collection_id") or ""
-    portal = get_portal_bancario()
-    mp_token = (portal.get("mp_access_token") or "").strip()
-
-    pago_verificado = status == "approved"
-    if payment_id and mp_token:
-        try:
-            req = urllib.request.Request(
-                f"https://api.mercadopago.com/v1/payments/{payment_id}",
-                headers={"Authorization": f"Bearer {mp_token}"},
-            )
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                info_pago = json.loads(resp.read().decode("utf-8"))
-                if (
-                    info_pago.get("status") == "approved"
-                    and str(info_pago.get("external_reference", "")) == codigo
-                ):
-                    pago_verificado = True
-        except Exception:
-            pass
-
-    if pago_verificado:
-        with get_db_connection() as conn:
-            conn.execute(
-                "UPDATE pedidos SET estado = 'Pagado' WHERE codigo = ? AND estado = 'Pendiente'",
-                (codigo,),
-            )
-            conn.commit()
-        flash("🎉 ¡Pago en línea acreditado exitosamente por Mercado Pago! Tu pedido ya está confirmado.", "success")
-    elif status in ("in_process", "pending"):
-        flash("⏳ Tu pago en Mercado Pago está en proceso de validación. Se actualizará apenas se acredite.", "success")
-    else:
-        flash("El pago en Mercado Pago no se completó. Puedes intentarlo nuevamente o transferir directo.", "error")
-
-    return redirect(url_for("ver_pedido", codigo=codigo))
-
-
-@app.route("/api/webhook/mercadopago", methods=["POST", "GET"])
-def webhook_mercadopago():
-    """Webhook automático de Mercado Pago para marcar el pedido como Pagado aunque el cliente cierre el navegador."""
-    data = request.get_json(silent=True) or {}
-    payment_id = (
-        (data.get("data") or {}).get("id")
-        or request.args.get("data.id")
-        or request.args.get("id")
-    )
-    topic = data.get("type") or request.args.get("topic") or request.args.get("type") or ""
-    portal = get_portal_bancario()
-    mp_token = (portal.get("mp_access_token") or "").strip()
-
-    if payment_id and mp_token and "payment" in str(topic).lower():
-        try:
-            req = urllib.request.Request(
-                f"https://api.mercadopago.com/v1/payments/{payment_id}",
-                headers={"Authorization": f"Bearer {mp_token}"},
-            )
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                info_pago = json.loads(resp.read().decode("utf-8"))
-                if info_pago.get("status") == "approved":
-                    cod_ref = str(info_pago.get("external_reference") or "").strip()
-                    if cod_ref:
-                        with get_db_connection() as conn:
-                            conn.execute(
-                                "UPDATE pedidos SET estado = 'Pagado' WHERE codigo = ? AND estado = 'Pendiente'",
-                                (cod_ref,),
-                            )
-                            conn.commit()
-        except Exception:
-            pass
-
-    return jsonify({"ok": True}), 200
 
 
 @app.route("/api/comprar", methods=["POST"])
