@@ -173,6 +173,19 @@ def init_db():
             VALUES ('datos_transferencia', '')
             """
         )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO configuracion (clave, valor)
+            VALUES ('banco_link_pago', 'https://fintoc.me/nanycreaciones')
+            """
+        )
+        conn.execute(
+            """
+            UPDATE configuracion
+            SET valor = 'https://fintoc.me/nanycreaciones'
+            WHERE clave = 'banco_link_pago' AND (valor = '' OR valor LIKE '%/onboarding/success/%')
+            """
+        )
 
         conn.execute(
             """
@@ -331,6 +344,15 @@ def get_portal_bancario() -> dict[str, str]:
                 resultado["banco_correo"] = m_mail.group(1) if m_mail else valor_despues
             elif ("nombre" in baja or "titular" in baja) and not resultado["banco_titular"]:
                 resultado["banco_titular"] = valor_despues
+
+    # Normalizar link de Fintoc.me / Slach.cl si pegaron la URL de onboarding
+    link_raw = resultado["banco_link_pago"].strip()
+    if "/onboarding/success/" in link_raw:
+        usuario_fintoc = link_raw.rstrip("/").split("/onboarding/success/")[-1].split("/")[0]
+        if usuario_fintoc:
+            resultado["banco_link_pago"] = f"https://fintoc.me/{usuario_fintoc}"
+    elif not link_raw:
+        resultado["banco_link_pago"] = "https://fintoc.me/nanycreaciones"
 
     return resultado
 
