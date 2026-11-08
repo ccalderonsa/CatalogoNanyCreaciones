@@ -202,16 +202,16 @@
                     <h3 style="font-size: 1rem; margin-bottom: 0.6rem; color: var(--primary-hover);">📐 Medidas por Rango de Edad</h3>
                     <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.55rem;">
                         <li>
-                            <strong>👶 2 a 5 años (Jardín / Preescolar):</strong><br>
-                            <span style="color: var(--text-muted);">Largo aprox. 48–52 cm × Ancho 40 cm. Con tiras ajustables en cuello y cintura para adaptarse a su crecimiento.</span>
+                            <strong>{{ guia_info['guia_talla_1_titulo'] }}:</strong><br>
+                            <span style="color: var(--text-muted);">{{ guia_info['guia_talla_1_desc'] }}</span>
                         </li>
                         <li>
-                            <strong>🧒 6 a 10 años (Escolar):</strong><br>
-                            <span style="color: var(--text-muted);">Largo aprox. 58–62 cm × Ancho 46 cm. Calce cómodo con bolsillo delantero y amarre regulable.</span>
+                            <strong>{{ guia_info['guia_talla_2_titulo'] }}:</strong><br>
+                            <span style="color: var(--text-muted);">{{ guia_info['guia_talla_2_desc'] }}</span>
                         </li>
                         <li>
-                            <strong>🎒 Morrales, Loncheras y Bolsos:</strong><br>
-                            <span style="color: var(--text-muted);">Tamaño práctico e impermeable/resistente, ideal para colación, muda de ropa o útiles.</span>
+                            <strong>{{ guia_info['guia_talla_3_titulo'] }}:</strong><br>
+                            <span style="color: var(--text-muted);">{{ guia_info['guia_talla_3_desc'] }}</span>
                         </li>
                     </ul>
                 </div>
@@ -219,11 +219,10 @@
                 <!-- Consejos de Lavado y Cuidado -->
                 <div style="background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 1.1rem;">
                     <h3 style="font-size: 1rem; margin-bottom: 0.6rem; color: #0f766e;">🧼 Cuidados y Lavado</h3>
-                    <ul style="list-style: none; padding: 0; margin: 0; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.5rem;">
-                        <li>💧 <strong>Lavado suave:</strong> Lavar con agua fría o tibia (a mano o ciclo delicado en lavadora).</li>
-                        <li>🚫 <strong>Sin cloro:</strong> No usar blanqueadores fuertes para mantener los colores y diseños intactos.</li>
-                        <li>🌤️ <strong>Secado:</strong> Secar a la sombra en lugar ventilado.</li>
-                        <li>✨ <strong>Si lleva nombre estampado:</strong> Planchar siempre a temperatura tibia <strong>por el revés de la tela</strong> (nunca pasar la plancha directo sobre el nombre).</li>
+                    <ul style="list-style: disc; padding-left: 1.15rem; margin: 0; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.45rem;">
+                        {% for linea in guia_info['guia_cuidados'].splitlines() if linea.strip() %}
+                            <li>{{ linea.strip() }}</li>
+                        {% endfor %}
                     </ul>
                 </div>
             </div>
@@ -231,21 +230,21 @@
             <!-- Preguntas Frecuentes Desplegables -->
             <div style="display: flex; flex-direction: column; gap: 0.55rem;">
                 <details style="background: #fffdf9; border: 1px solid var(--border); border-radius: 12px; padding: 0.75rem 1rem;">
-                    <summary style="font-weight: 700; cursor: pointer; font-size: 0.92rem;">✨ ¿Cómo funciona el estampado de nombre personalizado (+$1.500)?</summary>
+                    <summary style="font-weight: 700; cursor: pointer; font-size: 0.92rem;">{{ guia_info['guia_faq_1_preg'] }}</summary>
                     <p style="margin: 0.5rem 0 0; font-size: 0.87rem; color: var(--text-muted);">
-                        Al revisar tu pedido en el carrito, marca la opción <strong>«Agregar Nombre Estampado (+$1.500)»</strong> y escribe el nombre del niño o niña. Personalizamos tu producto con acabado duradero y prolijo.
+                        {{ guia_info['guia_faq_1_resp'] }}
                     </p>
                 </details>
                 <details style="background: #fffdf9; border: 1px solid var(--border); border-radius: 12px; padding: 0.75rem 1rem;">
-                    <summary style="font-weight: 700; cursor: pointer; font-size: 0.92rem;">🏦 ¿Cómo se realiza el pago y la confirmación?</summary>
+                    <summary style="font-weight: 700; cursor: pointer; font-size: 0.92rem;">{{ guia_info['guia_faq_2_preg'] }}</summary>
                     <p style="margin: 0.5rem 0 0; font-size: 0.87rem; color: var(--text-muted);">
-                        Al confirmar tu pedido recibirás un enlace a tu <strong>Comprobante Digital</strong> donde podrás transferir en línea sin comisión o copiar nuestros datos bancarios en 1 clic y adjuntar la captura de tu comprobante ahí mismo.
+                        {{ guia_info['guia_faq_2_resp'] }}
                     </p>
                 </details>
                 <details style="background: #fffdf9; border: 1px solid var(--border); border-radius: 12px; padding: 0.75rem 1rem;">
-                    <summary style="font-weight: 700; cursor: pointer; font-size: 0.92rem;">🚚 ¿Cómo funcionan las entregas y envíos a domicilio?</summary>
+                    <summary style="font-weight: 700; cursor: pointer; font-size: 0.92rem;">{{ guia_info['guia_faq_3_preg'] }}</summary>
                     <p style="margin: 0.5rem 0 0; font-size: 0.87rem; color: var(--text-muted);">
-                        Puedes elegir <strong>Retiro / Punto de encuentro</strong> (sin costo extra, coordinado por WhatsApp) o <strong>Envío a domicilio (+$3.000)</strong>. Cuando tu pedido sea despachado, podrás ver tu número de seguimiento en vivo desde el botón <strong>📦 Seguimiento</strong>.
+                        {{ guia_info['guia_faq_3_resp'] }}
                     </p>
                 </details>
             </div>
@@ -494,24 +493,16 @@
                     <h3 style="font-size: 0.98rem; margin-bottom: 0.6rem; color: var(--primary-hover);">📐 Tabla de Medidas Referenciales</h3>
                     <div style="display: flex; flex-direction: column; gap: 0.55rem; font-size: 0.88rem;">
                         <div style="background: #fff; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1px solid #f0e6dd;">
-                            <strong>👶 Talla 2 a 5 años (Preescolar / Jardín)</strong>
-                            <p style="margin: 0.2rem 0 0; color: var(--text-muted);">
-                                • <strong>Medidas aprox.:</strong> 48 a 52 cm de largo × 40 cm de ancho.<br>
-                                • <strong>Ajuste:</strong> Tiras regulables en cuello y cintura para que le sirva durante varias etapas.
-                            </p>
+                            <strong>{{ guia_info['guia_talla_1_titulo'] }}</strong>
+                            <p style="margin: 0.2rem 0 0; color: var(--text-muted);">{{ guia_info['guia_talla_1_desc'] }}</p>
                         </div>
                         <div style="background: #fff; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1px solid #f0e6dd;">
-                            <strong>🧒 Talla 6 a 10 años (Escolar)</strong>
-                            <p style="margin: 0.2rem 0 0; color: var(--text-muted);">
-                                • <strong>Medidas aprox.:</strong> 58 a 62 cm de largo × 46 cm de ancho.<br>
-                                • <strong>Ajuste:</strong> Cómodo para talleres de cocina, arte o actividades escolares, con bolsillo frontal.
-                            </p>
+                            <strong>{{ guia_info['guia_talla_2_titulo'] }}</strong>
+                            <p style="margin: 0.2rem 0 0; color: var(--text-muted);">{{ guia_info['guia_talla_2_desc'] }}</p>
                         </div>
                         <div style="background: #fff; padding: 0.65rem 0.8rem; border-radius: 10px; border: 1px solid #f0e6dd;">
-                            <strong>🎒 Morrales, Loncheras y Accesorios</strong>
-                            <p style="margin: 0.2rem 0 0; color: var(--text-muted);">
-                                • Confeccionados con telas resistentes y fáciles de limpiar, ideales para llevar colación, botella, muda de ropa o útiles.
-                            </p>
+                            <strong>{{ guia_info['guia_talla_3_titulo'] }}</strong>
+                            <p style="margin: 0.2rem 0 0; color: var(--text-muted);">{{ guia_info['guia_talla_3_desc'] }}</p>
                         </div>
                     </div>
                 </div>
@@ -519,23 +510,26 @@
                 <div style="background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 14px; padding: 1rem;">
                     <h3 style="font-size: 0.98rem; margin-bottom: 0.5rem; color: #166534;">🧼 Recomendaciones de Lavado y Cuidado</h3>
                     <ul style="margin: 0; padding-left: 1.15rem; font-size: 0.87rem; color: #14532d; display: flex; flex-direction: column; gap: 0.35rem;">
-                        <li>Lavar con <strong>agua fría o tibia</strong> (a mano o en ciclo delicado).</li>
-                        <li><strong>No usar cloro</strong> ni blanqueadores para proteger los estampados y colores.</li>
-                        <li>Secar a la sombra; evitar secadora de alta temperatura.</li>
-                        <li>Si tu producto tiene <strong>nombre personalizado</strong>, planchar siempre <strong>por el revés de la tela</strong> a temperatura baja/media.</li>
+                        {% for linea in guia_info['guia_cuidados'].splitlines() if linea.strip() %}
+                            <li>{{ linea.strip() }}</li>
+                        {% endfor %}
                     </ul>
                 </div>
 
                 <div style="background: #fff; border: 1.5px solid var(--border); border-radius: 14px; padding: 1rem;">
                     <h3 style="font-size: 0.98rem; margin-bottom: 0.5rem;">❓ Preguntas Frecuentes</h3>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.86rem;">
+                    <div style="display: flex; flex-direction: column; gap: 0.55rem; font-size: 0.86rem;">
                         <div>
-                            <strong>¿Puedo agregar el nombre de mi hijo/a al diseño?</strong>
-                            <p style="margin: 0.15rem 0 0; color: var(--text-muted);">¡Sí! En el resumen de tu pedido puedes activar la casilla de <strong>Personalización (+$1.500)</strong> e indicar el nombre a estampar.</p>
+                            <strong>{{ guia_info['guia_faq_1_preg'] }}</strong>
+                            <p style="margin: 0.15rem 0 0; color: var(--text-muted);">{{ guia_info['guia_faq_1_resp'] }}</p>
                         </div>
                         <div>
-                            <strong>¿Cómo pago mi pedido?</strong>
-                            <p style="margin: 0.15rem 0 0; color: var(--text-muted);">Al confirmar tu pedido tendrás acceso a nuestro <strong>Portal de Transferencia en Línea (0% comisión)</strong> y podrás subir tu comprobante directo en la web.</p>
+                            <strong>{{ guia_info['guia_faq_2_preg'] }}</strong>
+                            <p style="margin: 0.15rem 0 0; color: var(--text-muted);">{{ guia_info['guia_faq_2_resp'] }}</p>
+                        </div>
+                        <div>
+                            <strong>{{ guia_info['guia_faq_3_preg'] }}</strong>
+                            <p style="margin: 0.15rem 0 0; color: var(--text-muted);">{{ guia_info['guia_faq_3_resp'] }}</p>
                         </div>
                     </div>
                 </div>
